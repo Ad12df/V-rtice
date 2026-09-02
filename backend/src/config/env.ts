@@ -8,6 +8,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url("SUPABASE_URL debe ser una URL válida"),
   SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY es requerido"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY es requerido"),
+  SUPABASE_PUBLISHABLE_KEY: z.string().min(1, "SUPABASE_PUBLISHABLE_KEY es requerido"),
+  SUPABASE_SECRET_KEY: z.string().min(1, "SUPABASE_SECRET_KEY es requerido"),
 });
 
 const parseEnv = () => {
