@@ -102,11 +102,13 @@ frontend/lib/
 │   ├── splash/
 │   │   └── presentation/
 │   │       └── screens/
-│   │           └── splash_screen.dart   # Pantalla de carga con radar y telemetría
+│   │           └── splash_screen.dart   # Pantalla de carga con radar, telemetría y ping de backend
 │   ├── auth/
+│   │   ├── services/
+│   │   │   └── auth_service.dart        # Integración con Supabase Auth SDK
 │   │   └── presentation/
 │   │       ├── screens/
-│   │       │   └── auth_screen.dart     # Login/Registro adaptativo (1 col móvil / 2 col tablet)
+│   │       │   └── auth_screen.dart     # Login/Registro adaptativo conectado a Supabase
 │   │       └── widgets/
 │   │           ├── custom_button.dart   # Botones reutilizables estilizados
 │   │           └── custom_text_field.dart # Inputs estilizados
@@ -114,7 +116,7 @@ frontend/lib/
 │       └── presentation/
 │           └── screens/
 │               └── map_screen.dart      # HUD Táctico y Cartografía interactiva Mapbox (El Salvador)
-└── main.dart                            # Punto de entrada ultralimpio
+└── main.dart                            # Inicialización de Supabase y arranque de la app
 ```
 
 ---

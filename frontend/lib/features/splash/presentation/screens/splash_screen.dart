@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:vertice/core/constants/app_colors.dart';
+import 'package:vertice/core/constants/environment.dart';
 import 'package:vertice/core/utils/responsive.dart';
 import 'package:vertice/features/auth/presentation/screens/auth_screen.dart';
 
@@ -32,6 +34,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
+
+    // Ping no bloqueante para despertar la instancia de Render en segundo plano
+    _pingBackendHealth();
 
     _pulseController = AnimationController(
       vsync: this,
@@ -79,6 +84,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         );
       }
     });
+  }
+
+  void _pingBackendHealth() {
+    http
+        .get(Uri.parse('${Environment.apiBaseUrl}/health'))
+        .timeout(const Duration(seconds: 6))
+        .then((_) {})
+        .catchError((_) {});
   }
 
   @override

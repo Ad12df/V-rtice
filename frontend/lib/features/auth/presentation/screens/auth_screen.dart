@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/core/utils/responsive.dart';
 import 'package:vertice/features/auth/presentation/widgets/custom_button.dart';
 import 'package:vertice/features/auth/presentation/widgets/custom_text_field.dart';
 import 'package:vertice/features/auth/presentation/widgets/password_strength_indicator.dart';
 import 'package:vertice/features/auth/presentation/widgets/tactical_alert_dialog.dart';
+import 'package:vertice/features/auth/services/auth_service.dart';
 import 'package:vertice/features/map/presentation/screens/map_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
+  final _authService = AuthService();
   late TabController _tabController;
   final _loginFormKey = GlobalKey<FormState>();
   final _registerFormKey = GlobalKey<FormState>();
@@ -76,26 +79,54 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     setState(() => _isLoginLoading = true);
 
-    // Simulación de respuesta de red
-    await Future.delayed(const Duration(milliseconds: 1400));
-    if (!mounted) return;
-    setState(() => _isLoginLoading = false);
+    try {
+      final email = _loginEmailController.text.trim();
+      final password = _loginPasswordController.text;
 
-    TacticalAlert.show(
-      context,
-      title: 'SINCRONIZACIÓN EXITOSA',
-      message: 'Protocolo de enlace verificado. Desplegando visor de cartografía...',
-      type: AlertType.success,
-    );
+      final response = await _authService.signInWithPassword(
+        email: email,
+        password: password,
+      );
 
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() => _isLoginLoading = false);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => const MapScreen(isGuest: false),
-      ),
-    );
+      if (response.user != null) {
+        TacticalAlert.show(
+          context,
+          title: 'SINCRONIZACIÓN EXITOSA',
+          message: 'Protocolo de enlace verificado. Desplegando visor de cartografía...',
+          type: AlertType.success,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const MapScreen(isGuest: false),
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoginLoading = false);
+      TacticalAlert.show(
+        context,
+        title: 'ERROR DE AUTENTICACIÓN',
+        message: e.message,
+        type: AlertType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoginLoading = false);
+      TacticalAlert.show(
+        context,
+        title: 'FALLA DE ENLACE',
+        message: 'No se pudo conectar con el servidor: $e',
+        type: AlertType.error,
+      );
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -113,26 +144,56 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     setState(() => _isRegisterLoading = true);
 
-    // Simulación de registro en red
-    await Future.delayed(const Duration(milliseconds: 1600));
-    if (!mounted) return;
-    setState(() => _isRegisterLoading = false);
+    try {
+      final name = _registerNameController.text.trim();
+      final email = _registerEmailController.text.trim();
+      final password = _registerPasswordController.text;
 
-    TacticalAlert.show(
-      context,
-      title: 'AGENTE REGISTRADO',
-      message: 'Identificador creado con éxito. Iniciando sesión de exploración...',
-      type: AlertType.success,
-    );
+      final response = await _authService.signUp(
+        email: email,
+        password: password,
+        displayName: name,
+      );
 
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() => _isRegisterLoading = false);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => const MapScreen(isGuest: false),
-      ),
-    );
+      if (response.user != null) {
+        TacticalAlert.show(
+          context,
+          title: 'AGENTE REGISTRADO',
+          message: 'Identificador creado con éxito en Supabase. Iniciando sesión de exploración...',
+          type: AlertType.success,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const MapScreen(isGuest: false),
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _isRegisterLoading = false);
+      TacticalAlert.show(
+        context,
+        title: 'ERROR EN REGISTRO',
+        message: e.message,
+        type: AlertType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isRegisterLoading = false);
+      TacticalAlert.show(
+        context,
+        title: 'FALLA DE ENLACE',
+        message: 'No se pudo completar el registro: $e',
+        type: AlertType.error,
+      );
+    }
   }
 
   void _handleGuestEntry() {
@@ -275,14 +336,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           height: 46,
                           onPressed: () {
                             if (recoveryFormKey.currentState!.validate()) {
+                              final email = recoveryEmailController.text.trim();
                               Navigator.of(dialogContext).pop();
-                              TacticalAlert.show(
-                                context,
-                                title: 'TOKEN TRANSMITIDO',
-                                message:
-                                    'Revisa tu bandeja de entrada para restaurar la clave de acceso.',
-                                type: AlertType.info,
-                              );
+                              _sendPasswordRecovery(email);
                             }
                           },
                         ),
@@ -296,6 +352,36 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         );
       },
     );
+  }
+
+  Future<void> _sendPasswordRecovery(String email) async {
+    try {
+      await _authService.resetPasswordForEmail(email);
+      if (!mounted) return;
+      TacticalAlert.show(
+        context,
+        title: 'TOKEN TRANSMITIDO',
+        message:
+            'Revisa tu bandeja de entrada para restaurar la clave de acceso.',
+        type: AlertType.info,
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      TacticalAlert.show(
+        context,
+        title: 'ERROR EN RECUPERACIÓN',
+        message: e.message,
+        type: AlertType.error,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      TacticalAlert.show(
+        context,
+        title: 'FALLA DE TRANSMISIÓN',
+        message: 'No se pudo enviar el token: $e',
+        type: AlertType.error,
+      );
+    }
   }
 
   @override

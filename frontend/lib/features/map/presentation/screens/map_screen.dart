@@ -3,7 +3,9 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/core/constants/environment.dart';
 import 'package:vertice/core/utils/responsive.dart';
+import 'package:vertice/features/auth/presentation/screens/auth_screen.dart';
 import 'package:vertice/features/auth/presentation/widgets/custom_button.dart';
+import 'package:vertice/features/auth/services/auth_service.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isGuest;
@@ -56,8 +58,16 @@ class _MapScreenState extends State<MapScreen> {
           IconButton(
             tooltip: 'Cerrar Sesión',
             icon: const Icon(Icons.logout_rounded, color: AppColors.textSecondary),
-            onPressed: () {
-              Navigator.of(context).pop();
+            onPressed: () async {
+              if (!widget.isGuest) {
+                await AuthService().signOut();
+              }
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                  (route) => false,
+                );
+              }
             },
           ),
         ],
