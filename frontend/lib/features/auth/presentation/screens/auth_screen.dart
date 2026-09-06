@@ -31,10 +31,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   bool _loginAutoValidate = false;
 
   // Controladores de Registro
-  final _registerNameController = TextEditingController();
+  final _registerFullNameController = TextEditingController();
+  final _registerUsernameController = TextEditingController();
+  final _registerBirthdateController = TextEditingController();
   final _registerEmailController = TextEditingController();
   final _registerPasswordController = TextEditingController();
   final _registerConfirmPasswordController = TextEditingController();
+  DateTime? _selectedBirthdate;
   bool _registerObscurePassword = true;
   bool _registerObscureConfirmPassword = true;
   bool _isRegisterLoading = false;
@@ -57,7 +60,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     _tabController.dispose();
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
-    _registerNameController.dispose();
+    _registerFullNameController.dispose();
+    _registerUsernameController.dispose();
+    _registerBirthdateController.dispose();
     _registerEmailController.dispose();
     _registerPasswordController.dispose();
     _registerConfirmPasswordController.dispose();
@@ -129,6 +134,44 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
+  Future<void> _selectBirthdate() async {
+    final now = DateTime.now();
+    final initialDate = _selectedBirthdate ?? DateTime(now.year - 20, 1, 1);
+    final firstDate = DateTime(1920);
+    final lastDate = DateTime(now.year - 5);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.cyan,
+              onPrimary: AppColors.background,
+              surface: AppColors.surfaceElevated,
+              onSurface: AppColors.textPrimary,
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: AppColors.surface,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedBirthdate = picked;
+        _registerBirthdateController.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
   Future<void> _handleRegister() async {
     setState(() => _registerAutoValidate = true);
 
@@ -145,14 +188,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     setState(() => _isRegisterLoading = true);
 
     try {
-      final name = _registerNameController.text.trim();
+      final fullName = _registerFullNameController.text.trim();
+      final username = _registerUsernameController.text.trim();
       final email = _registerEmailController.text.trim();
       final password = _registerPasswordController.text;
 
       final response = await _authService.signUp(
         email: email,
         password: password,
-        displayName: name,
+        fullName: fullName,
+        username: username,
+        birthdate: _selectedBirthdate,
       );
 
       if (!mounted) return;
@@ -885,26 +931,68 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           CustomTextField(
-            controller: _registerNameController,
-            label: 'Identificador / Alias',
-            hint: 'Cadete Alfa',
+            controller: _registerFullNameController,
+            label: 'Nombre Completo',
+            hint: 'Nombre y Apellidos',
             prefixIcon: Icons.badge_outlined,
+            textCapitalization: TextCapitalization.words,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Identificador de agente requerido';
+                return 'Nombre completo requerido';
               }
               if (value.trim().length < 3) {
-                return 'Alias muy corto (mín. 3 letras)';
+                return 'Ingresa al menos 3 caracteres';
               }
               return null;
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          CustomTextField(
+            controller: _registerUsernameController,
+            label: 'Nombre de Usuario / Alias',
+            hint: 'cadete_alfa',
+            prefixIcon: Icons.alternate_email_rounded,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Nombre de usuario requerido';
+              }
+              if (value.trim().length < 3) {
+                return 'Username muy corto (mín. 3 caracteres)';
+              }
+              if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
+                return 'Solo letras, números y guiones bajos';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: _selectBirthdate,
+            child: AbsorbPointer(
+              child: CustomTextField(
+                controller: _registerBirthdateController,
+                label: 'Fecha de Nacimiento',
+                hint: 'AAAA-MM-DD (Toca para seleccionar)',
+                prefixIcon: Icons.calendar_today_rounded,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.date_range_rounded, color: AppColors.cyan, size: 20),
+                  onPressed: _selectBirthdate,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Fecha de nacimiento requerida';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
           CustomTextField(
             controller: _registerEmailController,
             label: 'Correo de Enlace',
             hint: 'agente@vertice.sv',
-            prefixIcon: Icons.alternate_email_rounded,
+            prefixIcon: Icons.mail_outline_rounded,
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
@@ -917,7 +1005,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               return null;
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           CustomTextField(
             controller: _registerPasswordController,
             label: 'Crear Clave',

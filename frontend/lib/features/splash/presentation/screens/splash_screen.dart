@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/core/constants/environment.dart';
 import 'package:vertice/core/utils/responsive.dart';
-import 'package:vertice/features/auth/presentation/screens/auth_screen.dart';
+import 'package:vertice/main.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           PageRouteBuilder(
             transitionDuration: const Duration(milliseconds: 800),
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const AuthScreen(),
+                const AuthGate(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(
                 opacity: CurvedAnimation(

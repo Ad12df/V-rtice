@@ -4,6 +4,8 @@ import helmet from "@fastify/helmet";
 import { env } from "./config/env.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { placesRoutes } from "./modules/places/places.routes.js";
+import { locationsRoutes } from "./modules/locations/locations.routes.js";
+import { profilesRoutes } from "./modules/profiles/profiles.routes.js";
 
 export const buildApp = async (): Promise<FastifyInstance> => {
   const app = fastify({
@@ -23,10 +25,15 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // Rutas base y health check
   await app.register(healthRoutes);
 
+  // Alias directo para /api/locations solicitado
+  await app.register(locationsRoutes, { prefix: "/api/locations" });
+
   // Rutas versionadas de la API (/api/v1)
   await app.register(
     async (v1Instance) => {
       await v1Instance.register(placesRoutes, { prefix: "/places" });
+      await v1Instance.register(locationsRoutes, { prefix: "/locations" });
+      await v1Instance.register(profilesRoutes, { prefix: "/profiles" });
     },
     { prefix: "/api/v1" }
   );

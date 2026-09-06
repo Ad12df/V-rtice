@@ -10,6 +10,7 @@ class CustomTextField extends StatefulWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final TextInputType keyboardType;
+  final TextCapitalization textCapitalization;
   final String? Function(String?)? validator;
   final TextInputAction textInputAction;
   final void Function(String)? onFieldSubmitted;
@@ -26,6 +27,7 @@ class CustomTextField extends StatefulWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.keyboardType = TextInputType.text,
+    this.textCapitalization = TextCapitalization.none,
     this.validator,
     this.textInputAction = TextInputAction.next,
     this.onFieldSubmitted,
@@ -120,6 +122,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             focusNode: _effectiveFocusNode,
             obscureText: widget.obscureText,
             keyboardType: widget.keyboardType,
+            textCapitalization: widget.textCapitalization,
             textInputAction: widget.textInputAction,
             validator: widget.validator,
             autovalidateMode: widget.autovalidateMode,
