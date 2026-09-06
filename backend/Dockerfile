@@ -1,7 +1,7 @@
 # ==========================================
 # Etapa 1: Builder
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN npm run build
 # ==========================================
 # Etapa 2: Runner (Producción ultraligera)
 # ==========================================
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
