@@ -1,7 +1,7 @@
 {
   "name": "vertice-backend",
   "version": "1.0.0",
-  "description": "Backend API para la aplicación Vértice (Turismo en El Salvador con niebla de guerra)",
+  "description": "Backend API para la plataforma GeoTurismo (Turismo Táctico, Cartografía y Agenda de Eventos en El Salvador)",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {

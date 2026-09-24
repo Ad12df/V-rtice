@@ -10,7 +10,7 @@ const startServer = async () => {
       host: env.HOST,
     });
 
-    app.log.info(`🚀 Servidor Vértice Backend ejecutándose en ${address}`);
+    app.log.info(`🚀 Servidor GeoTurismo Backend ejecutándose en ${address}`);
     app.log.info(`📡 Healthcheck disponible en ${address}/health`);
     app.log.info(`📍 API Places disponible en ${address}/api/v1/places/nearby`);
   } catch (error) {

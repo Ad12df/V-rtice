@@ -1,5 +1,5 @@
 -- ====================================================================
--- PROYECTO: VÉRTICE (Turismo en El Salvador con Niebla de Guerra)
+-- PROYECTO: GEOTURISMO (Plataforma de Turismo Táctico en El Salvador)
 -- ESQUEMA DE BASE DE DATOS SUPABASE / POSTGRESQL + POSTGIS (RBAC)
 -- ====================================================================
 
@@ -129,6 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_locations_price_category ON public.locations(pric
 -- --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.events (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organizer_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE DEFAULT auth.uid(),
     title TEXT NOT NULL UNIQUE,
     description TEXT,
     category TEXT NOT NULL,
@@ -146,6 +147,10 @@ CREATE TABLE IF NOT EXISTS public.events (
 -- Asegurar columnas si la tabla ya existía
 DO $$ 
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'events' AND column_name = 'organizer_id') THEN
+        ALTER TABLE public.events ADD COLUMN organizer_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE DEFAULT auth.uid();
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'events' AND column_name = 'department') THEN
         ALTER TABLE public.events ADD COLUMN department TEXT NOT NULL DEFAULT 'San Salvador';
     END IF;
@@ -164,6 +169,7 @@ BEGIN
 END $$;
 
 -- Índices de consulta para events
+CREATE INDEX IF NOT EXISTS idx_events_organizer_id ON public.events(organizer_id);
 CREATE INDEX IF NOT EXISTS idx_events_status ON public.events(status);
 CREATE INDEX IF NOT EXISTS idx_events_department ON public.events(department);
 CREATE INDEX IF NOT EXISTS idx_events_location ON public.events USING GIST (location);
@@ -401,23 +407,32 @@ ON public.events FOR SELECT USING (
 );
 
 DROP POLICY IF EXISTS "Solo administradores pueden insertar eventos" ON public.events;
-CREATE POLICY "Solo administradores pueden insertar eventos"
-ON public.events FOR INSERT WITH CHECK (
-  public.is_admin() AND NOT public.is_banned()
+DROP POLICY IF EXISTS "Usuarios autenticados pueden insertar eventos" ON public.events;
+CREATE POLICY "Usuarios autenticados pueden insertar eventos"
+ON public.events FOR INSERT
+TO authenticated
+WITH CHECK (
+  NOT public.is_banned() AND (organizer_id = auth.uid() OR organizer_id IS NULL OR public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Solo administradores pueden modificar eventos" ON public.events;
-CREATE POLICY "Solo administradores pueden modificar eventos"
-ON public.events FOR UPDATE USING (
-  public.is_admin() AND NOT public.is_banned()
+DROP POLICY IF EXISTS "Usuarios pueden modificar sus propios eventos o administradores" ON public.events;
+CREATE POLICY "Usuarios pueden modificar sus propios eventos o administradores"
+ON public.events FOR UPDATE
+TO authenticated
+USING (
+  NOT public.is_banned() AND (organizer_id = auth.uid() OR public.is_admin())
 ) WITH CHECK (
-  public.is_admin() AND NOT public.is_banned()
+  NOT public.is_banned() AND (organizer_id = auth.uid() OR public.is_admin())
 );
 
 DROP POLICY IF EXISTS "Solo administradores pueden eliminar eventos" ON public.events;
-CREATE POLICY "Solo administradores pueden eliminar eventos"
-ON public.events FOR DELETE USING (
-  public.is_admin() AND NOT public.is_banned()
+DROP POLICY IF EXISTS "Usuarios pueden eliminar sus propios eventos o administradores" ON public.events;
+CREATE POLICY "Usuarios pueden eliminar sus propios eventos o administradores"
+ON public.events FOR DELETE
+TO authenticated
+USING (
+  NOT public.is_banned() AND (organizer_id = auth.uid() OR public.is_admin())
 );
 
 -- --- Políticas de USER_EXPLORATIONS ---
@@ -604,7 +619,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
--- Retorna la agenda de eventos tácticos ordenados por fecha de inicio
+-- Retorna la agenda de eventos tácticos ordenados por fecha de inicio con datos de organizador
 CREATE OR REPLACE FUNCTION public.get_all_events()
 RETURNS TABLE (
     id UUID,
@@ -620,7 +635,10 @@ RETURNS TABLE (
     end_date TIMESTAMPTZ,
     lat DOUBLE PRECISION,
     lng DOUBLE PRECISION,
-    created_at TIMESTAMPTZ
+    created_at TIMESTAMPTZ,
+    organizer_id UUID,
+    organizer_name TEXT,
+    organizer_avatar TEXT
 ) AS $$
 BEGIN
     IF public.is_banned() THEN
@@ -642,8 +660,12 @@ BEGIN
         e.end_date,
         ST_Y(e.location::geometry) AS lat,
         ST_X(e.location::geometry) AS lng,
-        e.created_at
+        e.created_at,
+        e.organizer_id,
+        COALESCE(p.username, p.full_name, 'Organizador') AS organizer_name,
+        p.avatar_url AS organizer_avatar
     FROM public.events e
+    LEFT JOIN public.profiles p ON e.organizer_id = p.id
     ORDER BY e.start_date ASC;
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
@@ -850,4 +872,9 @@ BEGIN
     SET role = 'admin', is_banned = false
     WHERE email = 'admin@vertice.app';
   END IF;
+
+  -- Asociar eventos existentes o semillas sin organizador al perfil del administrador
+  UPDATE public.events
+  SET organizer_id = admin_uid
+  WHERE organizer_id IS NULL AND EXISTS (SELECT 1 FROM public.profiles WHERE id = admin_uid);
 END $$;

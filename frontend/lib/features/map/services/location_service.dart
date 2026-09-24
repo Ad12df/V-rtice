@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -357,4 +359,87 @@ class LocationService {
       poisNotifier.value = updated;
     }
   }
+
+  /// Obtiene la ruta entre dos puntos vía API OSRM pública, con fallback geodésico si falla la conexión
+  Future<TacticalRouteResult> calculateRoute({
+    required LatLng start,
+    required LatLng destination,
+  }) async {
+    try {
+      final url = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${start.longitude},${start.latitude};${destination.longitude},${destination.latitude}'
+        '?overview=full&geometries=geojson',
+      );
+
+      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final routes = data['routes'] as List?;
+        if (routes != null && routes.isNotEmpty) {
+          final first = routes.first as Map<String, dynamic>;
+          final geometry = first['geometry'] as Map<String, dynamic>?;
+          final coords = geometry?['coordinates'] as List?;
+          final distanceMeters = (first['distance'] as num?)?.toDouble() ?? 0.0;
+          final durationSeconds = (first['duration'] as num?)?.toDouble() ?? 0.0;
+
+          if (coords != null && coords.isNotEmpty) {
+            final points = coords.map<LatLng>((c) {
+              final pair = c as List;
+              return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
+            }).toList();
+
+            return TacticalRouteResult(
+              points: points,
+              distanceKm: distanceMeters / 1000.0,
+              estimatedDuration: Duration(seconds: durationSeconds.round()),
+              isRealRoute: true,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('ℹ️ [LocationService] OSRM no disponible ($e). Usando cálculo geodésico directo.');
+    }
+
+    // Fallback: Línea geodésica directa y cálculo de distancia / tiempo estimado (velocidad media 50 km/h)
+    const distanceCalculator = Distance();
+    final distanceMeters = distanceCalculator.as(LengthUnit.Meter, start, destination);
+    final distanceKm = distanceMeters / 1000.0;
+    final travelMinutes = ((distanceKm / 50.0) * 60.0).round().clamp(1, 9999);
+
+    return TacticalRouteResult(
+      points: [start, destination],
+      distanceKm: distanceKm,
+      estimatedDuration: Duration(minutes: travelMinutes),
+      isRealRoute: false,
+    );
+  }
 }
+
+/// Resultado del cálculo de ruta táctica
+class TacticalRouteResult {
+  final List<LatLng> points;
+  final double distanceKm;
+  final Duration estimatedDuration;
+  final bool isRealRoute;
+
+  const TacticalRouteResult({
+    required this.points,
+    required this.distanceKm,
+    required this.estimatedDuration,
+    required this.isRealRoute,
+  });
+
+  String get formattedDistance => '${distanceKm.toStringAsFixed(1)} km';
+
+  String get formattedDuration {
+    final hours = estimatedDuration.inHours;
+    final minutes = estimatedDuration.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '$minutes min';
+  }
+}
+

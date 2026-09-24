@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/core/utils/responsive.dart';
 import 'package:vertice/features/auth/presentation/widgets/custom_button.dart';
@@ -45,7 +46,13 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
   bool _isFogActive = false;
   bool _showTelemetry = true;
   TacticalPoi? _selectedPoi;
+
+  // Estado de Ruta Táctica Dinámica (OSRM con fallback geodésico)
   bool _isRouteActive = false;
+  List<LatLng> _tacticalRoutePoints = [];
+  TacticalRouteResult? _currentRouteResult;
+  TacticalPoi? _routeDestinationPoi;
+  bool _isCalculatingRoute = false;
 
   // Estado de Perfil y Puntos de Interés dinámicos de Supabase
   UserProfile? _userProfile;
@@ -67,15 +74,6 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
 
   // Pines de usuario agregados interactivamente por toque en el mapa
   final List<TacticalPoi> _customPines = [];
-
-  // Ruta activa de ejemplo (San Salvador -> Volcán de Santa Ana)
-  final List<LatLng> _tacticalRoutePoints = const [
-    LatLng(13.6983, -89.1914), // San Salvador
-    LatLng(13.7220, -89.3000), // Santa Tecla
-    LatLng(13.7650, -89.4300), // Desvío a Opico / Sitio del Niño
-    LatLng(13.8100, -89.5200), // Carretera Panamericana hacia Santa Ana
-    LatLng(13.8533, -89.6300), // Volcán de Santa Ana
-  ];
 
   @override
   void initState() {
@@ -534,6 +532,147 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
     }
   }
 
+  /// Traza la ruta óptima entre el operador y el destino (OSRM con fallback geodésico)
+  Future<void> _traceRouteToDestination(TacticalPoi destination) async {
+    LatLng startPoint;
+    if (_userLocation != null) {
+      startPoint = _userLocation!;
+    } else {
+      setState(() => _isLocatingUser = true);
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+        startPoint = LatLng(pos.latitude, pos.longitude);
+        _userLocation = startPoint;
+      } catch (_) {
+        startPoint = const LatLng(13.6983, -89.1914);
+        _userLocation ??= startPoint;
+      } finally {
+        if (mounted) setState(() => _isLocatingUser = false);
+      }
+    }
+
+    setState(() {
+      _isCalculatingRoute = true;
+    });
+
+    final result = await _locationService.calculateRoute(
+      start: startPoint,
+      destination: destination.location,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isCalculatingRoute = false;
+        _isRouteActive = true;
+        _tacticalRoutePoints = result.points;
+        _currentRouteResult = result;
+        _routeDestinationPoi = destination;
+      });
+
+      // Ajustar cámara para encuadrar la ruta completa
+      try {
+        if (result.points.length >= 2) {
+          final bounds = LatLngBounds.fromPoints(result.points);
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: bounds,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
+            ),
+          );
+        } else {
+          _mapController.move(destination.location, 13.0);
+        }
+      } catch (_) {
+        _mapController.move(destination.location, 13.0);
+      }
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceElevated,
+          duration: const Duration(seconds: 4),
+          content: Row(
+            children: [
+              const Icon(Icons.alt_route_rounded, color: AppColors.goldenOrange, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RUTA TÁCTICA // ${result.isRealRoute ? "OSRM VIAL REAL" : "LÍNEA GEODÉSICA DIRECTA"}',
+                      style: const TextStyle(
+                        color: AppColors.goldenOrange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    Text(
+                      'Destino: ${destination.name} (${result.formattedDistance} • ETA: ${result.formattedDuration})',
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Cancela la ruta táctica activa
+  void _cancelRoute() {
+    setState(() {
+      _isRouteActive = false;
+      _tacticalRoutePoints = [];
+      _currentRouteResult = null;
+      _routeDestinationPoi = null;
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: AppColors.surfaceElevated,
+        content: Text(
+          'Ruta táctica cancelada.',
+          style: TextStyle(color: AppColors.textMuted),
+        ),
+      ),
+    );
+  }
+
+  /// Abre la navegación externa por voz paso a paso en Google Maps / Waze
+  Future<void> _openExternalNavigation(LatLng destination) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}',
+    );
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.surfaceElevated,
+            content: Text(
+              'No se pudo abrir navegación externa: $e',
+              style: const TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   /// Manejador de toque en el mapa para añadir pines tácticos interactivos
   void _onMapTap(TapPosition tapPosition, LatLng point) {
     if (_searchFocusNode.hasFocus) {
@@ -838,66 +977,86 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
               const SizedBox(height: 20),
 
               // Botones de Acción Táctica
-              Row(
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (poi.isCustom) ...[
-                    Expanded(
-                      child: CustomButton(
-                        text: 'ELIMINAR PIN',
-                        variant: ButtonVariant.outline,
-                        onPressed: () {
-                          setState(() {
-                            _customPines.removeWhere((p) => p.id == poi.id);
-                            if (_selectedPoi?.id == poi.id) {
-                              _selectedPoi = null;
-                            }
-                          });
-                          Navigator.of(ctx).pop();
-                        },
+                  Row(
+                    children: [
+                      if (poi.isCustom) ...[
+                        Expanded(
+                          child: CustomButton(
+                            text: 'ELIMINAR PIN',
+                            variant: ButtonVariant.outline,
+                            onPressed: () {
+                              setState(() {
+                                _customPines.removeWhere((p) => p.id == poi.id);
+                                if (_selectedPoi?.id == poi.id) {
+                                  _selectedPoi = null;
+                                }
+                              });
+                              Navigator.of(ctx).pop();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ] else ...[
+                        Expanded(
+                          child: CustomButton(
+                            text: _isRouteActive && _routeDestinationPoi?.id == poi.id
+                                ? 'CANCELAR RUTA'
+                                : 'TRAZAR RUTA',
+                            variant: ButtonVariant.outline,
+                            icon: _isRouteActive && _routeDestinationPoi?.id == poi.id
+                                ? Icons.close_rounded
+                                : Icons.alt_route_rounded,
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                              if (_isRouteActive && _routeDestinationPoi?.id == poi.id) {
+                                _cancelRoute();
+                              } else {
+                                _traceRouteToDestination(poi);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: CustomButton(
+                          text: 'ENFOCAR',
+                          variant: ButtonVariant.primary,
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _mapController.move(poi.location, 14.5);
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                  ] else ...[
-                    Expanded(
-                      child: CustomButton(
-                        text: _isRouteActive && _selectedPoi?.id == poi.id
-                            ? 'CANCELAR RUTA'
-                            : 'TRAZAR RUTA (ETA 1h 20m)',
-                        variant: ButtonVariant.outline,
-                        onPressed: () {
-                          setState(() {
-                            _isRouteActive = !_isRouteActive;
-                          });
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppColors.surfaceElevated,
-                              content: Row(
-                                children: [
-                                  Icon(Icons.alt_route_rounded, color: accentColor, size: 20),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    _isRouteActive
-                                        ? 'Ruta táctica hacia ${poi.name} (~65 km | ETA: 1h 20m)'
-                                        : 'Ruta táctica cancelada.',
-                                    style: const TextStyle(color: AppColors.textPrimary),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Opción "Abrir en Google Maps / Waze" mediante url_launcher
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.goldenOrange,
+                        side: const BorderSide(color: AppColors.goldenOrange, width: 1.2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: CustomButton(
-                      text: 'ENFOCAR',
-                      variant: ButtonVariant.primary,
+                      icon: const Icon(Icons.navigation_rounded, size: 16),
+                      label: const Text(
+                        'ABRIR EN GOOGLE MAPS / WAZE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
                       onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _mapController.move(poi.location, 14.5);
+                        _openExternalNavigation(poi.location);
                       },
                     ),
                   ),
@@ -1105,15 +1264,15 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                 ),
 
                 // Capa de Rutas Tácticas Orgánicas (PolylineLayer)
-                if (_isRouteActive)
+                if (_isRouteActive && _tacticalRoutePoints.isNotEmpty)
                   PolylineLayer(
                     polylines: [
                       Polyline(
                         points: _tacticalRoutePoints,
-                        color: AppColors.goldenOrange, // Naranja Dorado para caminos
-                        strokeWidth: 4.5,
+                        color: AppColors.goldenOrange, // Naranja Dorado (#F39C12)
+                        strokeWidth: 4.8,
                         borderColor: AppColors.navyBlue,
-                        borderStrokeWidth: 1.5,
+                        borderStrokeWidth: 1.8,
                       ),
                     ],
                   ),
@@ -1362,6 +1521,104 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                     ),
 
                   const Spacer(),
+
+                  // Banner Flotante de Ruta Activa Táctica
+                  if (_isRouteActive && _routeDestinationPoi != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withValues(alpha: 0.96),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.goldenOrange, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.goldenOrange.withValues(alpha: 0.25),
+                            blurRadius: 14,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.alt_route_rounded, color: AppColors.goldenOrange, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'RUTA: ${_routeDestinationPoi!.name.toUpperCase()}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.goldenOrange,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${_currentRouteResult?.formattedDistance ?? ''} • ETA: ${_currentRouteResult?.formattedDuration ?? ''} (${_currentRouteResult?.isRealRoute == true ? "OSRM VIAL" : "DIRECTO"})',
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 10.5,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Botón Abrir en Google Maps / Waze
+                          IconButton(
+                            icon: const Icon(Icons.navigation_rounded, color: AppColors.cyan, size: 20),
+                            tooltip: 'Abrir en Google Maps / Waze',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _openExternalNavigation(_routeDestinationPoi!.location),
+                          ),
+                          const SizedBox(width: 12),
+                          // Botón Cancelar Ruta
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 20),
+                            tooltip: 'Cancelar Ruta',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: _cancelRoute,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  if (_isCalculatingRoute)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.goldenOrange),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.goldenOrange),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Calculando waypoints tácticos (OSRM)...',
+                            style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontFamily: 'monospace'),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // Telemetría Inferior Táctica Flotante con Distancia en Tiempo Real y Descarte
                   if (_showTelemetry)

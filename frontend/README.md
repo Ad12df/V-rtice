@@ -1,163 +1,177 @@
-# 🧭 VÉRTICE — Plataforma de Turismo Oculto & Cartografía
+# 🧭 GeoTurismo — Aplicación Móvil Flutter
 
-> **Plataforma de exploración y turismo alternativo para El Salvador basada en mecánicas de mapa con niebla de guerra (*Fog of War*) estilo Animus / Assassin's Creed.**
-
----
-
-## 🎨 Concepto Visual & UI/UX
-
-La interfaz de usuario está diseñada bajo un enfoque **Minimalista Oscuro / Cyber-Cartográfico**, evocando consolas de sincronización satelital y telemetría táctica:
-
-* **Paleta de Colores (`AppColors`):**
-  * `Fondo Principal`: `#0A0A0C` (Negro profundo).
-  * `Superficies & Tarjetas`: `#141419` y `#1C1C24` con bordes sutiles en `#262633`.
-  * `Acento Neón (Sincronización)`: `#00F0FF` (Cyan Animus con micro-resplandor).
-  * `Acento Reliquia / Oro`: `#E5B842` (Dorado táctico para modo invitado y sincronizaciones).
-  * `Texto & Telemetría`: `#F0F2F5` (Primario) y `#8E92A0` (Secundario).
-* **Componentes Atómicos:**
-  * `CustomTextField`: Inputs responsivos con etiquetas superiores en mayúsculas, iconos sutiles y selector de visibilidad de clave.
-  * `CustomButton`: Botón modular con estados interactivos, variantes (Primary, Secondary, Outline, Ghost), ajuste elástico de texto y spinner de carga integrado.
-* **Experiencia de Entrada:**
-  * `SplashScreen`: Secuencia de arranque con radar giratorio adaptativo, pulso lumínico del glifo Vértice y telemetría dinámica en tiempo real antes de la transición suave a la autenticación.
-  * `MapScreen`: Cartografía táctica interactiva potenciada por el **SDK oficial de Mapbox** (`mapbox_maps_flutter`), centrada en El Salvador con orientación norte, gestos libres, retícula táctica y HUD superpuesto.
+Aplicación multiplataforma de turismo táctico y cartografía para El Salvador, construida con **Flutter 3.x** y **Dart 3.x**. Integra renderizado interactivo de mapas sobre teselas libres de OpenStreetMap / ArcGIS, cálculo de rutas viales en tiempo real mediante **OSRM**, sincronización reactiva directa con **Supabase** y un modelo de acceso gobernado por roles (**RBAC**).
 
 ---
 
-## 📱 Soporte Multi-dispositivo y Responsividad
+## 🎨 Identidad Visual & UI/UX
 
-La aplicación cuenta con una arquitectura de diseño adaptativo nativa en [`lib/core/utils/responsive.dart`](file:///c:/Users/javie/Documents/GitHub/V-rtice/frontend/lib/core/utils/responsive.dart):
+La interfaz de GeoTurismo combina el rigor técnico de los paneles de telemetría y cartografía táctica con la paleta orgánica y turística de El Salvador:
 
-* **Breakpoints Oficiales:**
-  * **Móviles (`< 600dp`)**: Layouts verticales optimizados para uso a una mano en smartphones convencionales y plegables cerrados.
-  * **Tablets & Plegables (`>= 600dp` y `< 1024dp`)**: Reorganización espacial de 2 columnas (ej. Marca e Historia a la izquierda, Formularios a la derecha) y escalas tipográficas proporcionadas.
-  * **Pantallas de Escritorio / Grandes (`>= 1024dp`)**: Contenedores acotados con `ConstrainedBox` (`maxWidth`) para evitar deformaciones o estiramientos excesivos.
-* **Helpers Disponibles:**
-  * `Responsive.isMobile(context)`, `Responsive.isTablet(context)`, `Responsive.isDesktop(context)`.
-  * `Responsive.value(context, mobile: ..., tablet: ..., desktop: ...)` para asignación rápida de tamaños de fuente, paddings y alturas.
-  * `ResponsiveLayout(mobile: ..., tablet: ..., desktop: ...)` para intercambio declarativo de vistas completas.
-
----
-
-## 🗺️ Configuración del SDK de Mapbox (Android / iOS)
-
-Para habilitar la cartografía táctica en tiempo real, se requiere configurar las credenciales de Mapbox:
-
-### 1. Variables de Entorno en Flutter
-Se puede pasar el token público en tiempo de compilación o ejecución con `--dart-define`:
-
-```bash
-flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijoi...
-```
-
-O editar el valor por defecto en [`lib/core/constants/environment.dart`](file:///c:/Users/javie/Documents/GitHub/V-rtice/frontend/lib/core/constants/environment.dart).
-
-### 2. Configuración para Android
-1. **Token Secreto de Descarga (SDK Binaries):**
-   Crea o añade en tu archivo global `~/.gradle/gradle.properties` (o en `android/gradle.properties`):
-   ```properties
-   MAPBOX_DOWNLOADS_TOKEN=sk.eyJ1Ijoi...
-   ```
-2. **Permisos de Ubicación & Internet (`android/app/src/main/AndroidManifest.xml`):**
-   Asegúrate de contar con los permisos requeridos dentro de la etiqueta `<manifest>`:
-   ```xml
-   <uses-permission android:name="android.permission.INTERNET" />
-   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-   ```
-
-### 3. Configuración para iOS
-1. **Token Secreto de Descarga:**
-   Crea o añade en `~/.netrc`:
-   ```text
-   machine api.mapbox.com
-     login mapbox
-     password sk.eyJ1Ijoi...
-   ```
-2. **Token Público en `ios/Runner/Info.plist`:**
-   Añade la clave del token y las descripciones de permisos de ubicación:
-   ```xml
-   <key>MBXAccessToken</key>
-   <string>pk.eyJ1Ijoi...</string>
-   <key>NSLocationWhenInUseUsageDescription</key>
-   <string>Vértice necesita tu ubicación para sincronizar sectores y despejar la niebla de guerra en el mapa.</string>
-   ```
+- **Tokens de Color Oficiales (`AppColors`):**
+  - `Azul Ubicación` (`#2A73B5`): Indicador del operador, radar y pines interactivos.
+  - `Verde Turquesa` (`#218B8D`): Bordes, isotipo, anillos de escáner y badges tácticos.
+  - `Naranja Dorado` (`#F39C12`): **Trazo de rutas viales (`PolylineLayer`)**, balizas de eventos y alertas.
+  - `Verde Volcán` (`#1E5A5A`): Atalayas naturales, cordilleras y chips de dificultad.
+  - `Azul Marino` (`#1B365D`): Contornos de polilíneas, textos principales en modo claro y sombras.
+  - `Fondo Neutro` (`#F8F9FA`): Superficies en modo claro.
+  - `Fondo Oscuro Táctico` (`#0D1B2A`): Entorno inmersivo nocturno de cartografía.
+- **Tipografía y Estilo:**
+  - Estilo monoespaciado limpio (`fontFamily: monospace`) para telemetría, coordenadas GPS y cabeceras de sistema.
+  - Títulos con espaciado expandido (`letterSpacing: 4-6`) y badges en mayúsculas estilo consola de mando.
 
 ---
 
-## 📂 Arquitectura del Proyecto (`frontend/lib/`)
+## 📂 Arquitectura Modular por Features (`lib/`)
 
-El frontend está estructurado bajo principios de **Clean Architecture** y separación por dominios (*feature-first*):
+La aplicación sigue los principios de **Clean Architecture Táctica** dividida por dominios funcionales (*feature-first*):
 
 ```text
 frontend/lib/
-├── core/
+├── main.dart                       # Inicialización de Supabase, AuthGate y temas globales
+├── core/                           # Capa transversal y utilidades compartidas
 │   ├── constants/
-│   │   ├── app_colors.dart         # Paleta de colores centralizada (#0A0A0C, #00F0FF, #E5B842)
-│   │   └── environment.dart        # Variables de entorno y llaves de acceso (Mapbox)
+│   │   ├── app_colors.dart         # Paleta de colores oficial de GeoTurismo
+│   │   └── environment.dart        # Configuración de URLs y credenciales públicas
+│   ├── localization/
+│   │   └── app_localizations.dart  # Diccionarios completos de traducción (Español / Inglés)
+│   ├── providers/
+│   │   └── settings_provider.dart  # Singleton ChangeNotifier para tema, escala y lenguaje
 │   ├── theme/
-│   │   └── app_theme.dart          # Configuración global de ThemeData oscuro
+│   │   └── app_theme.dart          # Temas Oscuro Táctico y Claro estructurados
 │   └── utils/
-│       └── responsive.dart         # Breakpoints y helpers para diseño adaptativo
-├── features/
-│   ├── splash/
-│   │   └── presentation/
-│   │       └── screens/
-│   │           └── splash_screen.dart   # Pantalla de carga con radar, telemetría y ping de backend
-│   ├── auth/
-│   │   ├── services/
-│   │   │   └── auth_service.dart        # Integración con Supabase Auth SDK
-│   │   └── presentation/
-│   │       ├── screens/
-│   │       │   └── auth_screen.dart     # Login/Registro adaptativo conectado a Supabase
-│   │       └── widgets/
-│   │           ├── custom_button.dart   # Botones reutilizables estilizados
-│   │           └── custom_text_field.dart # Inputs estilizados
-│   └── map/
-│       └── presentation/
-│           └── screens/
-│               └── map_screen.dart      # HUD Táctico y Cartografía interactiva Mapbox (El Salvador)
-└── main.dart                            # Inicialización de Supabase y arranque de la app
+│       └── responsive.dart         # Breakpoints adaptativos (Móvil <600dp, Tablet >=600dp)
+└── features/                       # Módulos organizados por dominio
+    ├── auth/                       # Autenticación y Registro con RBAC
+    │   ├── presentation/
+    │   │   ├── screens/auth_screen.dart # Formulario con indicador de entropía y fecha
+    │   │   └── widgets/            # CustomTextField, CustomButton, TacticalAlert
+    │   └── services/auth_service.dart   # Sincronización con GoTrue y gestión de perfiles
+    ├── map/                        # Cartografía y Trazado de Rutas
+    │   ├── presentation/
+    │   │   ├── screens/map_screen.dart  # Visor OpenStreetMap, PolylineLayer y radar
+    │   │   └── widgets/
+    │   │       ├── add_location_modal.dart   # Modal de captura GPS para administradores
+    │   │       └── advanced_search_modal.dart# Filtro por 14 departamentos y zonas
+    │   └── services/
+    │       ├── location_service.dart    # PostGIS RPC y enrutamiento con OSRM
+    │       └── map_cache_service.dart   # Caché persistente de teselas en SQLite
+    ├── events/                     # Agenda Táctica de Eventos
+    │   ├── models/tactical_event.dart   # Modelo de datos con serialización Supabase
+    │   ├── presentation/
+    │   │   ├── screens/events_screen.dart# Lista reactiva y buscador en tiempo real
+    │   │   └── widgets/add_event_modal.dart # Creación de eventos con organizer_id
+    │   └── services/events_service.dart # Sincronización con RPC get_all_events
+    ├── settings/                   # Ajustes y Consola Administrativa
+    │   └── presentation/screens/
+    │       ├── settings_screen.dart     # Perfil, cambio de password, avatar y GPS switch
+    │       └── admin_panel_screen.dart  # Panel de Mando (Operadores, Eventos, Atalayas)
+    ├── shell/                      # Contenedor de Navegación
+    │   └── presentation/screens/app_shell.dart # Barra inferior y botón radar flotante
+    └── splash/                     # Pantalla de Arranque
+        └── presentation/screens/splash_screen.dart # Escáner radar, isotipo y ping de salud
 ```
 
 ---
 
-## 🚀 Cómo Ejecutar el Proyecto
+## 🖥️ Componentes Clave de la Interfaz (UI)
 
-### Requisitos Previos
-* **Flutter SDK** (versión `>= 3.13.2` o superior).
-* Dispositivo físico Android/iOS configurado con depuración USB o emulador en ejecución.
+### 1. `MapScreen` (`features/map/presentation/screens/map_screen.dart`)
+- **Capas Cartográficas:** Renderizado de teselas mediante `flutter_map` (ArcGIS Dark Gray Canvas con fallback a OpenStreetMap estándar).
+- **Rutas Viales Tácticas (`PolylineLayer`):** Traza el camino vial óptimo en color **Naranja Dorado (`#F39C12`)** con contorno **Azul Marino (`#1B365D`)** calculado por OSRM.
+- **Captura GPS para Administradores:** Si el usuario tiene rol `admin`, se despliega un botón flotante (`admin_capture_current_position_fab`) y se habilita la pulsación sobre el mapa para registrar una atalaya con coordenadas exactas en tiempo real.
+- **Lanzador de Navegación Externa:** Botón de un toque para abrir la ruta en **Google Maps** o **Waze** a través de `url_launcher`.
+- **Buscador y Filtro Territorial:** Modal avanzado con los 14 departamentos y 4 zonas de El Salvador, filtrando por costo y dificultad.
 
-### Pasos de Inicialización
+### 2. `EventsScreen` (`features/events/presentation/screens/events_screen.dart`)
+- **Lista Reactiva:** Conectada a `EventsService.eventsNotifier`, actualizándose instantáneamente ante inserciones o modificaciones.
+- **Filtrado Dinámico:** Búsqueda en tiempo real por título, descripción, ubicación o departamento, y filtrado por estado (`upcoming`, `live`, `completed`).
+- **Modal de Creación `AddEventModal`:** Disponible para usuarios autenticados; auto-asigna el `auth.uid()` como `organizer_id` para garantizar la autoría del evento.
 
-1. **Navegar a la carpeta frontend:**
-   ```bash
-   cd frontend
-   ```
+### 3. `AuthScreen` y `SplashScreen`
+- **Isotipo Oficial y Anillo de Escáner:** Incorporan el emblema de GeoTurismo con un radar animado de escaneo, resplandor turquesa pulsante y micro-animaciones continuas.
+- **Tipografía ASCII Limpia:** Indicadores de estado del sistema (`SYS-BOOT // V1.0`, `EL SALVADOR`), telemetría paso a paso y diseño de consola de comando.
+- **Seguridad en Entrada:** Formulario con medidor de entropía de contraseñas (`PasswordStrengthIndicator`), selector de fecha de nacimiento y protección contra contraseñas débiles.
 
-2. **Obtener dependencias:**
-   ```bash
-   flutter pub get
-   ```
-
-3. **Verificar análisis de código (sin advertencias ni errores):**
-   ```bash
-   flutter analyze
-   ```
-
-4. **Ejecutar pruebas unitarias / de widgets:**
-   ```bash
-   flutter test
-   ```
-
-5. **Lanzar la aplicación:**
-   ```bash
-   flutter run --dart-define=MAPBOX_ACCESS_TOKEN=tu_token_aqui
-   ```
+### 4. `AdminPanelScreen` (`features/settings/presentation/screens/admin_panel_screen.dart`)
+- **Consola de Mando para Administradores:**
+  1. *OPERADORES:* Nómina completa de usuarios con control de suspensión/desuspensión inmediata (`is_banned`).
+  2. *EVENTOS:* Modificación y eliminación de la agenda de eventos.
+  3. *ATALAYAS:* Control CRUD de destinos y atalayas turísticas.
+  4. *ESTADÍSTICAS:* Métricas cuantitativas del sistema y desglose territorial por departamento.
 
 ---
 
-## 🗺️ Próximas Funcionalidades
-- [x] Integración con el SDK oficial de Mapbox (`mapbox_maps_flutter`) con estilos oscuros y telemetría.
-- [ ] Módulo de sincronización GPS para despejar polígonos visitados en tiempo real (Niebla de Guerra).
-- [ ] Sistema de desbloqueo de "Puntos de Sincronización" (monumentos, volcanes, reservas naturales).
-- [ ] Backend en FastAPI / Node.js para persistencia de progreso y rutas turísticas.
+## 🔄 Flujo de Servicios y Sincronización con Supabase
+
+```
+  ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+  │   AuthService   │       │ LocationService │       │  EventsService  │
+  └────────┬────────┘       └────────┬────────┘       └────────┬────────┘
+           │                         │                         │
+           │ GoTrue                  │ RPC get_all_locations   │ RPC get_all_events
+           │ JWT / Storage           │ OSRM Driving Engine     │ CRUD en 'events'
+           ▼                         ▼                         ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                      SUPABASE BACKEND-AS-A-SERVICE                  │
+  │                                                                     │
+  │   • Autenticación: auth.users -> Triggers -> public.profiles        │
+  │   • Políticas RLS: Validación en cada INSERT, UPDATE y DELETE       │
+  │   • Storage: Subida de avatares a bucket 'avatars'                  │
+  │   • Cálculos Espaciales: Funciones PL/pgSQL PostGIS en servidor     │
+  └─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. Enrutamiento Vial con OSRM
+En `LocationService.calculateTacticalRoute`:
+- Realiza una petición HTTP a `https://router.project-osrm.org/route/v1/driving/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson`.
+- Decodifica la geometría GeoJSON en una lista de puntos `LatLng` para alimentar el `PolylineLayer`.
+- Si el servicio externo no responde en 4 segundos, conmuta automáticamente a un cálculo geodésico Haversine en línea recta como mecanismo de resiliencia.
+
+### 2. Caché de Teselas Offline (`MapCacheService`)
+- Almacena en una base de datos local SQLite (`dio_cache_interceptor_db_store`) las teselas cartográficas de todo El Salvador para los niveles de zoom del 8 al 11.
+- Permite la visualización continua de la cartografía básica incluso sin conectividad a internet en áreas remotas o senderos de montaña.
+
+### 3. Almacenamiento Multimedia (Storage)
+- Al actualizar el avatar en `SettingsScreen`, la imagen se comprime en formato JPEG y se sube directamente al bucket `avatars` en la ruta `{user_id}/avatar_{timestamp}.jpg`.
+- La URL pública generada se almacena en la columna `avatar_url` de `public.profiles`.
+
+---
+
+## 🚀 Guía de Instalación y Compilación
+
+### 1. Requisitos Previos
+- Flutter SDK `>= 3.24.0` (Dart `>= 3.5.0`).
+- Android Studio / Android SDK configurado con Java 17 o 21.
+
+### 2. Configurar Variables de Entorno
+Verifica los valores en [`lib/core/constants/environment.dart`](file:///frontend/lib/core/constants/environment.dart):
+```dart
+abstract class Environment {
+  static const String supabaseUrl = 'https://tu-proyecto.supabase.co';
+  static const String supabaseAnonKey = 'tu-llave-anonima-publica';
+  static const String apiBaseUrl = 'https://tu-backend-en-render.onrender.com';
+}
+```
+
+### 3. Comandos de Desarrollo
+```bash
+cd frontend
+
+# Descargar dependencias
+flutter pub get
+
+# Ejecutar análisis estático de código (debe reportar 0 issues)
+flutter analyze
+
+# Iniciar aplicación en emulador o dispositivo conectado
+flutter run
+```
+
+### 4. Compilación del APK para Producción (Android)
+Para generar el archivo binario optimizado para distribución en dispositivos Android:
+```bash
+flutter build apk --release
+```
+El archivo resultante se generará en:
+`build/app/outputs/flutter-apk/app-release.apk`

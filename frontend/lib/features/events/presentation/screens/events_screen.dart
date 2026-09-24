@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/core/utils/responsive.dart';
+import 'package:vertice/features/auth/services/auth_service.dart';
 import 'package:vertice/features/events/models/tactical_event.dart';
+import 'package:vertice/features/events/presentation/widgets/add_event_modal.dart';
 import 'package:vertice/features/events/services/events_service.dart';
 
 /// Pantalla de Agenda de Eventos Tácticos, Culturales y Expediciones en El Salvador
@@ -20,8 +22,10 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   final EventsService _eventsService = EventsService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
+  UserProfile? _userProfile;
   TacticalEventStatus? _selectedStatusFilter;
   String _searchQuery = '';
 
@@ -29,11 +33,33 @@ class _EventsScreenState extends State<EventsScreen> {
   void initState() {
     super.initState();
     _eventsService.fetchEvents();
+    _loadUserProfile();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
+  }
+
+  Future<void> _loadUserProfile() async {
+    final profile = await _authService.getCurrentUserProfile();
+    if (mounted && profile != null) {
+      setState(() => _userProfile = profile);
+    }
+  }
+
+  bool get _canCreateEvent {
+    final user = _authService.currentUser;
+    if (user == null) return false;
+    if (_userProfile != null && _userProfile!.isBanned) return false;
+    return true;
+  }
+
+  Future<void> _openCreateEventModal() async {
+    final created = await AddEventModal.show(context);
+    if (created != null && mounted) {
+      _eventsService.fetchEvents();
+    }
   }
 
   @override
@@ -114,6 +140,17 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
           ],
         ),
+        actions: [
+          if (_canCreateEvent)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.goldenOrange),
+                tooltip: 'Publicar Evento',
+                onPressed: _openCreateEventModal,
+              ),
+            ),
+        ],
         centerTitle: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -123,6 +160,23 @@ class _EventsScreenState extends State<EventsScreen> {
           ),
         ),
       ),
+      floatingActionButton: _canCreateEvent
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.goldenOrange,
+              foregroundColor: AppColors.navyBlue,
+              elevation: 4,
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text(
+                'CREAR EVENTO',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11.5,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              onPressed: _openCreateEventModal,
+            )
+          : null,
       body: ValueListenableBuilder<List<TacticalEvent>>(
         valueListenable: _eventsService.eventsNotifier,
         builder: (context, eventsList, _) {
@@ -465,7 +519,60 @@ class _EventsScreenState extends State<EventsScreen> {
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
+
+            // Insignia del Organizador
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.surfaceBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (event.organizerAvatar != null && event.organizerAvatar!.isNotEmpty) ...[
+                    ClipOval(
+                      child: Image.network(
+                        event.organizerAvatar!,
+                        width: 16,
+                        height: 16,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.person_rounded,
+                          size: 15,
+                          color: AppColors.goldenOrange,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                  ] else ...[
+                    const Icon(
+                      Icons.person_outline_rounded,
+                      size: 15,
+                      color: AppColors.goldenOrange,
+                    ),
+                    const SizedBox(width: 7),
+                  ],
+                  Flexible(
+                    child: Text(
+                      'Organizado por: ${event.organizerName != null && event.organizerName!.isNotEmpty ? event.organizerName : 'Agente'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.turquoise,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Metadatos: Fecha/Hora, Ubicación y Precio
             Container(

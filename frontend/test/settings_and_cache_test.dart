@@ -69,12 +69,12 @@ void main() {
   group('AppLocalizations Tests', () {
     test('Translates keys properly in Spanish and English', () {
       final locEs = AppLocalizations(const Locale('es'));
-      expect(locEs.appName, 'VÉRTICE');
+      expect(locEs.appName, 'GeoTurismo');
       expect(locEs.tacticalMap, 'MAPA TÁCTICO');
       expect(locEs.themeDark, 'Oscuro Táctico');
 
       final locEn = AppLocalizations(const Locale('en'));
-      expect(locEn.appName, 'VÉRTICE');
+      expect(locEn.appName, 'GeoTurismo');
       expect(locEn.tacticalMap, 'TACTICAL MAP');
       expect(locEn.themeDark, 'Tactical Dark');
     });

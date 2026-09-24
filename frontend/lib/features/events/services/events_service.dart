@@ -38,10 +38,10 @@ class EventsService {
         debugPrint('ℹ️ [EventsService] RPC get_all_events fallback: $rpcErr');
       }
 
-      // 2. Consulta directa sobre la tabla events
+      // 2. Consulta directa sobre la tabla events con relación de organizador
       final data = await _supabase
           .from('events')
-          .select('id, title, description, category, department, location_name, status, price_category, price_amount, start_date, end_date, location, created_at')
+          .select('id, organizer_id, title, description, category, department, location_name, status, price_category, price_amount, start_date, end_date, location, created_at, profiles(username, full_name, avatar_url)')
           .order('start_date', ascending: true);
 
       if (data.isNotEmpty) {
@@ -71,7 +71,16 @@ class EventsService {
 
     try {
       final insertData = event.toSupabaseInsert();
-      final res = await _supabase.from('events').insert(insertData).select();
+      if (!insertData.containsKey('organizer_id') || insertData['organizer_id'] == null) {
+        final currentUid = _supabase.auth.currentUser?.id;
+        if (currentUid != null) {
+          insertData['organizer_id'] = currentUid;
+        }
+      }
+      final res = await _supabase
+          .from('events')
+          .insert(insertData)
+          .select('*, profiles(username, full_name, avatar_url)');
       if (res.isNotEmpty) {
         final inserted = TacticalEvent.fromSupabase(res.first);
         final list = List<TacticalEvent>.from(eventsNotifier.value);

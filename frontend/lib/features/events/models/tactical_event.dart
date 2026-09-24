@@ -57,6 +57,9 @@ class TacticalEvent {
   final TacticalEventStatus status;
   final String category;
   final IconData icon;
+  final String? organizerId;
+  final String? organizerName;
+  final String? organizerAvatar;
 
   const TacticalEvent({
     required this.id,
@@ -74,6 +77,9 @@ class TacticalEvent {
     required this.status,
     required this.category,
     this.icon = Icons.event_available_rounded,
+    this.organizerId,
+    this.organizerName,
+    this.organizerAvatar,
   });
 
   String get formattedDate =>
@@ -134,6 +140,16 @@ class TacticalEvent {
     final timeStr = (json['time'] as String?) ??
         _formatTimeRange(startDate, endDate);
 
+    final organizerId = json['organizer_id'] as String?;
+    String? organizerName = json['organizer_name'] as String?;
+    String? organizerAvatar = json['organizer_avatar'] as String?;
+
+    if (json['profiles'] != null && json['profiles'] is Map) {
+      final pMap = json['profiles'] as Map<String, dynamic>;
+      organizerName ??= (pMap['username'] as String?) ?? (pMap['full_name'] as String?);
+      organizerAvatar ??= pMap['avatar_url'] as String?;
+    }
+
     return TacticalEvent(
       id: (json['id'] as String?) ?? UniqueKey().toString(),
       title: (json['title'] as String?) ?? 'Evento Táctico',
@@ -150,6 +166,9 @@ class TacticalEvent {
       status: status,
       category: category,
       icon: _getIconForCategory(category),
+      organizerId: organizerId,
+      organizerName: organizerName,
+      organizerAvatar: organizerAvatar,
     );
   }
 
@@ -167,6 +186,7 @@ class TacticalEvent {
       'start_date': date.toIso8601String(),
       if (endDate != null) 'end_date': endDate!.toIso8601String(),
       'location': wktLocation,
+      if (organizerId != null) 'organizer_id': organizerId,
     };
   }
 
@@ -217,6 +237,9 @@ class TacticalEvent {
     TacticalEventStatus? status,
     String? category,
     IconData? icon,
+    String? organizerId,
+    String? organizerName,
+    String? organizerAvatar,
   }) {
     return TacticalEvent(
       id: id ?? this.id,
@@ -234,6 +257,9 @@ class TacticalEvent {
       status: status ?? this.status,
       category: category ?? this.category,
       icon: icon ?? this.icon,
+      organizerId: organizerId ?? this.organizerId,
+      organizerName: organizerName ?? this.organizerName,
+      organizerAvatar: organizerAvatar ?? this.organizerAvatar,
     );
   }
 }
