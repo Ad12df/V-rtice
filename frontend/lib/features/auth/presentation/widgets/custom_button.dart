@@ -87,7 +87,7 @@ class CustomButton extends StatelessWidget {
       height: effectiveHeight,
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         border: borderSide != BorderSide.none
             ? Border.fromBorderSide(borderSide)
             : null,
@@ -96,7 +96,7 @@ class CustomButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
           onTap: isEnabled ? onPressed : null,
           splashColor: variant == ButtonVariant.primary
               ? Colors.white.withValues(alpha: 0.2)

@@ -24,11 +24,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Timer? _navigationTimer;
 
   final List<String> _telemetryMessages = [
-    'INICIALIZANDO SATÉLITES SV...',
+    'INICIALIZANDO SATELITES SV...',
     'CALIBRANDO NIEBLA DE GUERRA...',
-    'DESTRABANDO PROTOCOLOS DE CARTOGRAFÍA...',
-    'SINCRONIZANDO VÉRTICES Y PUNTOS DE INTERÉS...',
-    'ESTABLECIENDO CONEXIÓN CON VÉRTICE...',
+    'DESTRABANDO PROTOCOLOS DE CARTOGRAFIA...',
+    'SINCRONIZANDO DESTINOS Y PUNTOS DE INTERES...',
+    'ESTABLECIENDO CONEXION CON GEOTURISMO...',
   ];
 
   @override
@@ -108,8 +108,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     final isTabletOrLarger = !Responsive.isMobile(context);
     final radarBoxSize = isTabletOrLarger ? 260.0 : 200.0;
     final emblemSize = isTabletOrLarger ? 110.0 : 90.0;
-    final emblemIconSize = isTabletOrLarger ? 52.0 : 42.0;
-    final titleFontSize = isTabletOrLarger ? 38.0 : 30.0;
+    final titleFontSize = isTabletOrLarger ? 32.0 : 26.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -143,14 +142,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                 height: 6,
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: AppColors.cyan,
+                                  color: AppColors.turquoise,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               const Text(
                                 'SYS-BOOT // V1.0',
                                 style: TextStyle(
-                                  color: AppColors.cyan,
+                                  color: AppColors.turquoise,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.5,
@@ -192,7 +191,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                   );
                                 },
                               ),
-                              // Pulsing Glow & Vertex Glyph
+                              // Pulsing Glow & Logo Emblem
                               AnimatedBuilder(
                                 animation: _pulseController,
                                 builder: (context, child) {
@@ -205,29 +204,30 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                         shape: BoxShape.circle,
                                         color: AppColors.surfaceElevated,
                                         border: Border.all(
-                                          color: AppColors.cyan.withValues(alpha: 0.8),
-                                          width: 2,
+                                          color: AppColors.turquoise,
+                                          width: 2.2,
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.cyan.withValues(
+                                            color: AppColors.turquoise.withValues(
                                               alpha: _glowAnimation.value,
                                             ),
                                             blurRadius: 30,
                                             spreadRadius: 6,
                                           ),
                                           BoxShadow(
-                                            color: AppColors.gold.withValues(alpha: 0.15),
+                                            color: AppColors.goldenOrange.withValues(alpha: 0.25),
                                             blurRadius: 15,
                                             spreadRadius: 1,
                                           ),
                                         ],
                                       ),
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.change_history_rounded,
-                                          color: AppColors.cyan,
-                                          size: emblemIconSize,
+                                      child: ClipOval(
+                                        child: Image.asset(
+                                          'assets/images/logo.png',
+                                          width: emblemSize,
+                                          height: emblemSize,
+                                          fit: BoxFit.cover,
                                         ),
                                       ),
                                     ),
@@ -241,17 +241,17 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       const SizedBox(height: 32),
                       // Title Typography
                       Text(
-                        'V É R T I C E',
+                        'G E O T U R I S M O',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: titleFontSize,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 8,
+                          letterSpacing: 4,
                         ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'TURISMO ALTERNATIVO & CARTOGRAFÍA OCULTA',
+                        'TURISMO TACTICO & CARTOGRAFIA // SV',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
@@ -280,7 +280,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               child: const LinearProgressIndicator(
                                 minHeight: 3,
                                 backgroundColor: AppColors.surfaceBorder,
-                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.cyan),
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.turquoise),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -291,7 +291,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                 key: ValueKey<int>(_telemetryIndex),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: AppColors.cyan,
+                                  color: AppColors.turquoise,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 1.2,
@@ -304,7 +304,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'COORD: 13°47\'N 88°53\'W // ANIMS-CORE LOADED',
+                        'COORD: 13.7942 N, 88.8965 W // GEOTURISMO CORE',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 10,
@@ -336,12 +336,12 @@ class _RadarRingPainter extends CustomPainter {
     final arcRadius = (boxSize / 2) * 0.95;
 
     final outerPaint = Paint()
-      ..color = AppColors.cyan.withValues(alpha: 0.25)
+      ..color = AppColors.turquoise.withValues(alpha: 0.25)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
     final dashPaint = Paint()
-      ..color = AppColors.gold.withValues(alpha: 0.45)
+      ..color = AppColors.goldenOrange.withValues(alpha: 0.45)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 

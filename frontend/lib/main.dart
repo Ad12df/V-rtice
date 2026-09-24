@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vertice/core/constants/environment.dart';
+import 'package:vertice/core/localization/app_localizations.dart';
+import 'package:vertice/core/providers/settings_provider.dart';
 import 'package:vertice/core/theme/app_theme.dart';
 import 'package:vertice/features/auth/presentation/screens/auth_screen.dart';
-import 'package:vertice/features/map/presentation/screens/map_screen.dart';
+import 'package:vertice/features/map/services/map_cache_service.dart';
+import 'package:vertice/features/shell/presentation/screens/app_shell.dart';
 import 'package:vertice/features/splash/presentation/screens/splash_screen.dart';
 
 Future<void> main() async {
@@ -17,13 +21,19 @@ Future<void> main() async {
     anonKey: Environment.supabaseAnonKey,
   );
 
+  // Carga reactiva de preferencias de usuario persistidas (Tema, Escala e Idioma)
+  await SettingsProvider.instance.loadSettings();
+
+  // Inicialización del almacén SQLite de caché offline para cartografía táctica
+  await MapCacheService.instance.initialize();
+
   // Configuración de la barra de estado inmersiva para interfaz táctica oscura
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
       statusBarBrightness: Brightness.dark,
-      systemNavigationBarColor: Color(0xFF0A0A0C),
+      systemNavigationBarColor: Color(0xFF0D1B2A),
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
@@ -36,11 +46,36 @@ class VerticeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vértice - Turismo Oculto',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const SplashScreen(),
+    return ListenableBuilder(
+      listenable: SettingsProvider.instance,
+      builder: (context, _) {
+        final settings = SettingsProvider.instance;
+        return MaterialApp(
+          title: 'GeoTurismo',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: settings.themeMode,
+          locale: settings.locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const SplashScreen(),
+          builder: (context, child) {
+            final mediaQueryData = MediaQuery.of(context);
+            return MediaQuery(
+              data: mediaQueryData.copyWith(
+                textScaler: TextScaler.linear(settings.textScaleFactor),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -56,7 +91,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = Supabase.instance.client.auth.currentSession;
         if (session != null) {
-          return const MapScreen(isGuest: false);
+          return const AppShell();
         }
         return const AuthScreen();
       },

@@ -1,6 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Modelo de Perfil de Usuario con soporte RBAC (Admin / User)
+/// Modelo de Perfil de Usuario con soporte RBAC (Admin / User) y Control de Suspensión
 class UserProfile {
   final String id;
   final String role;
@@ -9,6 +10,7 @@ class UserProfile {
   final String? email;
   final DateTime? birthdate;
   final String? avatarUrl;
+  final bool isBanned;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -20,6 +22,7 @@ class UserProfile {
     this.email,
     this.birthdate,
     this.avatarUrl,
+    this.isBanned = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -38,6 +41,7 @@ class UserProfile {
           ? DateTime.tryParse(json['birthdate'] as String)
           : null,
       avatarUrl: json['avatar_url'] as String?,
+      isBanned: (json['is_banned'] as bool?) ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
@@ -56,9 +60,34 @@ class UserProfile {
       'email': email,
       'birthdate': birthdate?.toIso8601String().split('T').first,
       'avatar_url': avatarUrl,
+      'is_banned': isBanned,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
+  }
+
+  UserProfile copyWith({
+    String? role,
+    String? fullName,
+    String? username,
+    String? email,
+    DateTime? birthdate,
+    String? avatarUrl,
+    bool? isBanned,
+    DateTime? updatedAt,
+  }) {
+    return UserProfile(
+      id: id,
+      role: role ?? this.role,
+      fullName: fullName ?? this.fullName,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      birthdate: birthdate ?? this.birthdate,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isBanned: isBanned ?? this.isBanned,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 
@@ -83,15 +112,42 @@ class AuthService {
   /// Stream de cambios de estado de autenticación
   Stream<AuthState> get onAuthStateChange => _auth.onAuthStateChange;
 
-  /// Iniciar sesión con Correo y Contraseña
+  /// Iniciar sesión con Correo y Contraseña, con validación inmediata de suspensión
   Future<AuthResponse> signInWithPassword({
     required String email,
     required String password,
   }) async {
-    return await _auth.signInWithPassword(
+    final response = await _auth.signInWithPassword(
       email: email.trim(),
       password: password,
     );
+
+    if (response.user != null) {
+      // Verificar inmediatamente si la cuenta está suspendida en public.profiles
+      try {
+        final profileData = await _supabase
+            .from('profiles')
+            .select()
+            .eq('id', response.user!.id)
+            .maybeSingle();
+
+        if (profileData != null) {
+          final isBanned = (profileData['is_banned'] as bool?) ?? false;
+          if (isBanned) {
+            await _auth.signOut();
+            throw const AuthException(
+              'CUENTA SUSPENDIDA: Su acceso ha sido desactivado por un Administrador.',
+            );
+          }
+        }
+      } on AuthException {
+        rethrow;
+      } catch (e) {
+        debugPrint('ℹ️ [AuthService] Advertencia al verificar estado de suspensión: $e');
+      }
+    }
+
+    return response;
   }
 
   /// Registrar nuevo usuario con Correo, Contraseña, Nombre Completo, Username y Fecha de Nacimiento
@@ -126,6 +182,7 @@ class AuthService {
   }
 
   /// Obtener el perfil del usuario actual desde la tabla 'profiles'
+  /// Si el usuario está marcado como suspendido, cierra sesión automáticamente.
   Future<UserProfile?> getCurrentUserProfile() async {
     final user = currentUser;
     if (user == null) return null;
@@ -138,8 +195,17 @@ class AuthService {
           .maybeSingle();
 
       if (data == null) return null;
-      return UserProfile.fromJson(data);
-    } catch (_) {
+      final profile = UserProfile.fromJson(data);
+
+      if (profile.isBanned) {
+        debugPrint('🚫 [AuthService] Usuario ${profile.id} está suspendido. Cerrando sesión...');
+        await signOut();
+        return null;
+      }
+
+      return profile;
+    } catch (e) {
+      debugPrint('⚠️ [AuthService] Error al consultar perfil del usuario actual: $e');
       return null;
     }
   }
@@ -148,6 +214,38 @@ class AuthService {
   Future<bool> isCurrentUserAdmin() async {
     final profile = await getCurrentUserProfile();
     return profile?.isAdmin ?? false;
+  }
+
+  /// Obtener todos los perfiles registrados en el sistema (Exclusivo para Administradores)
+  Future<List<UserProfile>> getAllProfiles() async {
+    try {
+      final data = await _supabase
+          .from('profiles')
+          .select()
+          .order('created_at', ascending: false);
+
+      return (data as List)
+          .map((item) => UserProfile.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('⚠️ [AuthService] Error al obtener listado de perfiles: $e');
+      rethrow;
+    }
+  }
+
+  /// Alternar el estado de suspensión (baneo) de un usuario en Supabase
+  Future<void> toggleUserBan(String userId, bool currentStatus) async {
+    try {
+      final newStatus = !currentStatus;
+      await _supabase.from('profiles').update({
+        'is_banned': newStatus,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      debugPrint('🔄 [AuthService] Usuario $userId actualizado: is_banned = $newStatus');
+    } catch (e) {
+      debugPrint('⚠️ [AuthService] Error al alternar baneo del usuario $userId: $e');
+      rethrow;
+    }
   }
 
   /// Actualizar los datos del perfil propio

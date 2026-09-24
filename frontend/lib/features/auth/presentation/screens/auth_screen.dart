@@ -7,7 +7,7 @@ import 'package:vertice/features/auth/presentation/widgets/custom_text_field.dar
 import 'package:vertice/features/auth/presentation/widgets/password_strength_indicator.dart';
 import 'package:vertice/features/auth/presentation/widgets/tactical_alert_dialog.dart';
 import 'package:vertice/features/auth/services/auth_service.dart';
-import 'package:vertice/features/map/presentation/screens/map_screen.dart';
+import 'package:vertice/features/shell/presentation/screens/app_shell.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -109,17 +109,27 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => const MapScreen(isGuest: false),
+            builder: (_) => const AppShell(),
           ),
         );
       }
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _isLoginLoading = false);
+      // Manejo específico para cuentas suspendidas o correos no confirmados
+      final isBanned = e.message.contains('CUENTA SUSPENDIDA');
+      final isEmailNotConfirmed = !isBanned &&
+          (e.message.toLowerCase().contains('email not confirmed') ||
+              e.message.toLowerCase().contains('email link') ||
+              e.statusCode == '400');
       TacticalAlert.show(
         context,
-        title: 'ERROR DE AUTENTICACIÓN',
-        message: e.message,
+        title: isBanned
+            ? 'ACCESO DENEGADO // SUSPENSIÓN'
+            : (isEmailNotConfirmed ? 'CORREO NO VERIFICADO' : 'ERROR DE AUTENTICACIÓN'),
+        message: isEmailNotConfirmed
+            ? 'Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.'
+            : e.message,
         type: AlertType.error,
       );
     } catch (e) {
@@ -202,24 +212,75 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       );
 
       if (!mounted) return;
-      setState(() => _isRegisterLoading = false);
 
       if (response.user != null) {
-        TacticalAlert.show(
-          context,
-          title: 'AGENTE REGISTRADO',
-          message: 'Identificador creado con éxito en Supabase. Iniciando sesión de exploración...',
-          type: AlertType.success,
-        );
-
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (!mounted) return;
-
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const MapScreen(isGuest: false),
-          ),
-        );
+        // Si ya hay sesión activa (confirmación de email desactivada en Supabase),
+        // navegar directamente al mapa.
+        if (response.session != null) {
+          setState(() => _isRegisterLoading = false);
+          TacticalAlert.show(
+            context,
+            title: 'AGENTE REGISTRADO',
+            message: 'Identificador creado. Desplegando visor de cartografía...',
+            type: AlertType.success,
+          );
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const AppShell(),
+            ),
+          );
+        } else {
+          // La sesión no está activa (confirmación de email habilitada).
+          // Intentar login automático con las credenciales recién ingresadas.
+          try {
+            final loginResponse = await _authService.signInWithPassword(
+              email: email,
+              password: password,
+            );
+            if (!mounted) return;
+            setState(() => _isRegisterLoading = false);
+            if (loginResponse.user != null && loginResponse.session != null) {
+              TacticalAlert.show(
+                context,
+                title: 'AGENTE REGISTRADO',
+                message: 'Identificador creado. Desplegando visor de cartografía...',
+                type: AlertType.success,
+              );
+              await Future.delayed(const Duration(milliseconds: 600));
+              if (!mounted) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => const AppShell(),
+                ),
+              );
+            } else {
+              // No se pudo hacer auto-login: pedir al usuario que confirme email
+              TacticalAlert.show(
+                context,
+                title: 'REGISTRO EXITOSO',
+                message: 'Cuenta creada. Por favor confirma tu correo electrónico para iniciar sesión.',
+                type: AlertType.info,
+              );
+              _tabController.animateTo(0);
+              setState(() {});
+            }
+          } catch (_) {
+            if (!mounted) return;
+            setState(() => _isRegisterLoading = false);
+            TacticalAlert.show(
+              context,
+              title: 'REGISTRO EXITOSO',
+              message: 'Cuenta creada. Confirma tu correo e inicia sesión.',
+              type: AlertType.info,
+            );
+            _tabController.animateTo(0);
+            setState(() {});
+          }
+        }
+      } else {
+        setState(() => _isRegisterLoading = false);
       }
     } on AuthException catch (e) {
       if (!mounted) return;
@@ -240,21 +301,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         type: AlertType.error,
       );
     }
-  }
-
-  void _handleGuestEntry() {
-    TacticalAlert.show(
-      context,
-      title: 'CONEXIÓN DE EMERGENCIA',
-      message: 'Ingresando como Explorador Anónimo. La telemetría será temporal.',
-      type: AlertType.info,
-    );
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const MapScreen(isGuest: true),
-      ),
-    );
   }
 
   void _showPasswordRecoveryDialog() {
@@ -292,106 +338,108 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             ),
             child: Form(
               key: recoveryFormKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.cyan.withValues(alpha: 0.15),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.cyan.withValues(alpha: 0.15),
+                          ),
+                          child: const Icon(
+                            Icons.lock_reset_rounded,
+                            color: AppColors.cyan,
+                            size: 22,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.lock_reset_rounded,
-                          color: AppColors.cyan,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'RECUPERAR PROTOCOLO',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RECUPERAR PROTOCOLO',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Restablecimiento de clave criptográfica',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 11,
+                              Text(
+                                'Restablecimiento de clave criptográfica',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Ingresa tu identificador o correo asociado para enviarte un token de reautenticación segura.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      height: 1.4,
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  CustomTextField(
-                    controller: recoveryEmailController,
-                    label: 'Correo de Enlace',
-                    hint: 'agente@vertice.sv',
-                    prefixIcon: Icons.alternate_email_rounded,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) {
-                        return 'Ingresa tu correo electrónico';
-                      }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                          .hasMatch(val.trim())) {
-                        return 'Sintaxis de enlace inválida';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomButton(
-                          text: 'CANCELAR',
-                          variant: ButtonVariant.ghost,
-                          height: 46,
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                        ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Ingresa tu identificador o correo asociado para enviarte un token de reautenticación segura.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: CustomButton(
-                          text: 'ENVIAR TOKEN',
-                          variant: ButtonVariant.primary,
-                          height: 46,
-                          onPressed: () {
-                            if (recoveryFormKey.currentState!.validate()) {
-                              final email = recoveryEmailController.text.trim();
-                              Navigator.of(dialogContext).pop();
-                              _sendPasswordRecovery(email);
-                            }
-                          },
+                    ),
+                    const SizedBox(height: 18),
+                    CustomTextField(
+                      controller: recoveryEmailController,
+                      label: 'Correo de Enlace',
+                      hint: 'agente@vertice.sv',
+                      prefixIcon: Icons.alternate_email_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Ingresa tu correo electrónico';
+                        }
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(val.trim())) {
+                          return 'Sintaxis de enlace inválida';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: CustomButton(
+                            text: 'CANCELAR',
+                            variant: ButtonVariant.ghost,
+                            height: 46,
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: CustomButton(
+                            text: 'ENVIAR TOKEN',
+                            variant: ButtonVariant.primary,
+                            height: 46,
+                            onPressed: () {
+                              if (recoveryFormKey.currentState!.validate()) {
+                                final email = recoveryEmailController.text.trim();
+                                Navigator.of(dialogContext).pop();
+                                _sendPasswordRecovery(email);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -496,8 +544,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         _buildHeader(isCompact: true),
         const SizedBox(height: 28),
         _buildFormCard(),
-        const SizedBox(height: 20),
-        _buildGuestOption(),
         const SizedBox(height: 18),
         _buildFooter(),
       ],
@@ -534,8 +580,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildFormCard(),
-                const SizedBox(height: 20),
-                _buildGuestOption(),
                 const SizedBox(height: 16),
                 _buildFooter(),
               ],
@@ -552,49 +596,48 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           isCompact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
         Container(
-          width: isCompact ? 58 : 68,
-          height: isCompact ? 58 : 68,
+          width: isCompact ? 68 : 80,
+          height: isCompact ? 68 : 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.surfaceElevated,
             border: Border.all(
-              color: AppColors.cyan.withValues(alpha: 0.6),
-              width: 1.5,
+              color: AppColors.turquoise,
+              width: 2.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cyan.withValues(alpha: 0.25),
-                blurRadius: 20,
+                color: AppColors.turquoise.withValues(alpha: 0.35),
+                blurRadius: 18,
                 spreadRadius: 2,
               ),
             ],
           ),
-          child: Center(
-            child: Icon(
-              Icons.change_history_rounded,
-              color: AppColors.cyan,
-              size: isCompact ? 28 : 34,
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.cover,
             ),
           ),
         ),
         const SizedBox(height: 16),
         Text(
-          'V É R T I C E',
+          'GEOTURISMO',
           style: TextStyle(
             color: AppColors.textPrimary,
-            fontSize: isCompact ? 26 : 32,
+            fontSize: isCompact ? 24 : 30,
             fontWeight: FontWeight.w900,
-            letterSpacing: isCompact ? 6 : 8,
+            letterSpacing: isCompact ? 4 : 6,
           ),
         ),
         const SizedBox(height: 6),
         Text(
-          'Descubre el territorio oculto',
+          'Turismo Táctico & Naturaleza // El Salvador',
           style: TextStyle(
             color: AppColors.textSecondary,
-            fontSize: isCompact ? 13 : 15,
-            fontWeight: FontWeight.w400,
-            letterSpacing: 1.2,
+            fontSize: isCompact ? 12 : 14,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1.0,
           ),
         ),
       ],
@@ -1084,38 +1127,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildGuestOption() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            const Expanded(child: Divider(color: AppColors.surfaceBorder)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'O ACCESO DE EMERGENCIA',
-                style: TextStyle(
-                  color: AppColors.gold.withValues(alpha: 0.8),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            const Expanded(child: Divider(color: AppColors.surfaceBorder)),
-          ],
-        ),
-        const SizedBox(height: 14),
-        CustomButton(
-          text: 'CONTINUAR COMO EXPLORADOR INVITADO',
-          icon: Icons.radar_rounded,
-          variant: ButtonVariant.outline,
-          onPressed: _handleGuestEntry,
-        ),
-      ],
     );
   }
 

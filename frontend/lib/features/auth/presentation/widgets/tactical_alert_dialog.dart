@@ -9,7 +9,8 @@ class TacticalAlert {
     required String title,
     required String message,
     AlertType type = AlertType.info,
-    Duration duration = const Duration(milliseconds: 3200),
+    Duration duration = const Duration(milliseconds: 4000),
+    VoidCallback? onClose,
   }) {
     Color accentColor;
     IconData icon;
@@ -50,7 +51,7 @@ class TacticalAlert {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: AppColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: accentColor.withValues(alpha: 0.8),
               width: 1.2,
@@ -128,6 +129,31 @@ class TacticalAlert {
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Botón de cierre táctico ("X") para descartar manualmente con un toque
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  onClose?.call();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surfaceBorder,
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textMuted,
+                    size: 16,
+                  ),
                 ),
               ),
             ],

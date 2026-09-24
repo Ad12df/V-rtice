@@ -39,6 +39,16 @@ dependencies:
   supabase_flutter: ^2.17.2
   http: ^1.6.0
   geolocator: ^13.0.2
+  image_picker: ^1.1.2
+  shared_preferences: ^2.5.5
+  flutter_map_cache: ^1.5.2
+  dio_cache_interceptor: ^3.5.1
+  dio_cache_interceptor_file_store: ^1.2.3
+  path_provider: ^2.1.6
+  flutter_localizations:
+    sdk: flutter
+  dio_cache_interceptor_db_store: ^6.0.0
+  dio: ^5.7.0
 
 dev_dependencies:
   flutter_test:
@@ -62,10 +72,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

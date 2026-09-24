@@ -106,7 +106,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: _isFocused
                 ? [
                     BoxShadow(

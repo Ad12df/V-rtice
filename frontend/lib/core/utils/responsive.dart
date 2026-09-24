@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Breakpoints estándar para el diseño adaptativo de Vértice.
+/// Breakpoints estandar para el diseno adaptativo de GeoTurismo.
 class ResponsiveBreakpoints {
   static const double mobileMax = 600.0;
   static const double tabletMax = 1024.0;
 }
 
-/// Helper utilitario para consultas de diseño responsivo y adaptativo.
+/// Helper utilitario para consultas de diseno responsivo y adaptativo.
 class Responsive {
   static bool isMobile(BuildContext context) =>
       MediaQuery.sizeOf(context).width < ResponsiveBreakpoints.mobileMax;
@@ -20,7 +20,7 @@ class Responsive {
   static bool isDesktop(BuildContext context) =>
       MediaQuery.sizeOf(context).width >= ResponsiveBreakpoints.tabletMax;
 
-  /// Retorna un valor adaptado según el breakpoint de la pantalla.
+  /// Retorna un valor adaptado segun el breakpoint de la pantalla.
   static T value<T>(
     BuildContext context, {
     required T mobile,
@@ -43,7 +43,7 @@ class Responsive {
   static double height(BuildContext context) => MediaQuery.sizeOf(context).height;
 }
 
-/// Widget constructor para renderizar layouts específicos según el tamaño de pantalla.
+/// Widget constructor para renderizar layouts especificos segun el tamano de pantalla.
 class ResponsiveLayout extends StatelessWidget {
   final Widget mobile;
   final Widget? tablet;
@@ -60,11 +60,11 @@ class ResponsiveLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= ResponsiveBreakpoints.tabletMax && desktop != null) {
-          return desktop!;
+        if (constraints.maxWidth >= ResponsiveBreakpoints.tabletMax) {
+          return desktop ?? tablet ?? mobile;
         }
-        if (constraints.maxWidth >= ResponsiveBreakpoints.mobileMax && tablet != null) {
-          return tablet!;
+        if (constraints.maxWidth >= ResponsiveBreakpoints.mobileMax) {
+          return tablet ?? mobile;
         }
         return mobile;
       },

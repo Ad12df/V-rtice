@@ -1,11 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
-        android:label="vertice"
+        android:label="GeoTurismo"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <!-- Deshabilitar Impeller para evitar la compilación de shaders con impellerc.exe,
              el cual es bloqueado por las políticas de Control de Aplicaciones de Windows.
              Esto hace que Flutter use Skia como motor de renderizado. -->
