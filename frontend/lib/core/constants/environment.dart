@@ -8,4 +8,10 @@ abstract class Environment {
 
   /// URL base de la API backend desplegada en Render
   static const String apiBaseUrl = 'https://v-rtice-mgze.onrender.com';
+
+  /// Clave API pública de TomTom Traffic API (Capa de Flujo de Tráfico en Tiempo Real)
+  static const String tomtomApiKey = String.fromEnvironment(
+    'TOMTOM_API_KEY',
+    defaultValue: 'YOUR_TOMTOM_KEY',
+  );
 }

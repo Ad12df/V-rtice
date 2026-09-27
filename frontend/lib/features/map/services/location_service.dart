@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vertice/core/constants/environment.dart';
 
 /// Modelo de Punto de Interés Táctico / Turismo en El Salvador con datos territoriales y de precio
 class TacticalPoi {
@@ -19,6 +20,7 @@ class TacticalPoi {
   final String priceCategory;
   final double entryFee;
   final String priceRange;
+  final String? imageUrl;
 
   const TacticalPoi({
     required this.id,
@@ -26,7 +28,7 @@ class TacticalPoi {
     required this.category,
     required this.location,
     required this.description,
-    required this.difficulty,
+    this.difficulty = 'MEDIA',
     required this.icon,
     this.isCustom = false,
     this.department = 'San Salvador',
@@ -34,6 +36,7 @@ class TacticalPoi {
     this.priceCategory = 'GRATUITO',
     this.entryFee = 0.00,
     this.priceRange = 'Gratis',
+    this.imageUrl,
   });
 
   factory TacticalPoi.fromSupabase(Map<String, dynamic> json) {
@@ -64,8 +67,8 @@ class TacticalPoi {
       }
     }
 
-    final category = (json['category'] as String?) ?? 'ATALAYA TURÍSTICA';
-    final name = (json['name'] as String?) ?? 'Punto Táctico';
+    final category = (json['category'] as String?) ?? 'DESTINO TURÍSTICO';
+    final name = (json['name'] as String?) ?? 'Punto Turístico';
 
     // Resolver departamento y zona geográfica a partir de metadatos o nombres conocidos
     final dept = (json['department'] as String?) ?? _deduceDepartment(name);
@@ -79,6 +82,11 @@ class TacticalPoi {
 
     final resolvedPriceRange = (json['price_range'] as String?) ??
         (fee <= 0.0 ? 'Gratis' : '\$${fee.toStringAsFixed(2)} USD');
+
+    final imgUrl = json['image_url'] as String? ??
+        ((json['images'] is List && (json['images'] as List).isNotEmpty)
+            ? (json['images'] as List).first.toString()
+            : null);
 
     return TacticalPoi(
       id: (json['id'] as String?) ?? UniqueKey().toString(),
@@ -95,6 +103,7 @@ class TacticalPoi {
       priceCategory: priceCat,
       entryFee: fee,
       priceRange: resolvedPriceRange,
+      imageUrl: imgUrl,
     );
   }
 
@@ -112,6 +121,7 @@ class TacticalPoi {
     String? priceCategory,
     double? entryFee,
     String? priceRange,
+    String? imageUrl,
   }) {
     return TacticalPoi(
       id: id ?? this.id,
@@ -127,6 +137,7 @@ class TacticalPoi {
       priceCategory: priceCategory ?? this.priceCategory,
       entryFee: entryFee ?? this.entryFee,
       priceRange: priceRange ?? this.priceRange,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -227,13 +238,13 @@ class TacticalPoi {
   }
 }
 
-/// Servicio singleton para consultar y gestionar ubicaciones y atalayas turísticas exclusivamente en Supabase
+/// Servicio singleton para consultar y gestionar ubicaciones y destinos turísticos exclusivamente en Supabase
 class LocationService {
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
   LocationService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
 
   /// Notificador reactivo con la lista completa de ubicaciones en memoria (inicia vacía)
   final ValueNotifier<List<TacticalPoi>> poisNotifier =
@@ -281,11 +292,11 @@ class LocationService {
     }
   }
 
-  /// Registrar un nuevo punto táctico / atalaya (Exclusivo Administradores)
+  /// Registrar un nuevo destino turístico (Exclusivo Administradores)
   Future<TacticalPoi> addPoi(TacticalPoi poi) async {
     try {
       final wktLocation = 'POINT(${poi.location.longitude} ${poi.location.latitude})';
-      final res = await _supabase.from('locations').insert({
+      final insertData = <String, dynamic>{
         'name': poi.name,
         'description': poi.description,
         'category': poi.category,
@@ -295,7 +306,12 @@ class LocationService {
         'price_category': poi.priceCategory,
         'entry_fee': poi.entryFee,
         'location': wktLocation,
-      }).select();
+      };
+      if (poi.imageUrl != null && poi.imageUrl!.isNotEmpty) {
+        insertData['image_url'] = poi.imageUrl;
+      }
+
+      final res = await _supabase.from('locations').insert(insertData).select();
 
       TacticalPoi savedPoi = poi;
       if (res.isNotEmpty) {
@@ -307,7 +323,7 @@ class LocationService {
       poisNotifier.value = updated;
       return savedPoi;
     } catch (e) {
-      debugPrint('⚠️ [LocationService] Error al insertar atalaya en Supabase: $e');
+      debugPrint('⚠️ [LocationService] Error al insertar destino turístico en Supabase: $e');
       final updated = List<TacticalPoi>.from(poisNotifier.value)..add(poi);
       poisNotifier.value = updated;
       return poi;
@@ -318,7 +334,7 @@ class LocationService {
   Future<void> updatePoi(TacticalPoi poi) async {
     try {
       final wktLocation = 'POINT(${poi.location.longitude} ${poi.location.latitude})';
-      await _supabase.from('locations').update({
+      final updateData = <String, dynamic>{
         'name': poi.name,
         'description': poi.description,
         'category': poi.category,
@@ -328,7 +344,12 @@ class LocationService {
         'price_category': poi.priceCategory,
         'entry_fee': poi.entryFee,
         'location': wktLocation,
-      }).eq('id', poi.id);
+      };
+      if (poi.imageUrl != null && poi.imageUrl!.isNotEmpty) {
+        updateData['image_url'] = poi.imageUrl;
+      }
+
+      await _supabase.from('locations').update(updateData).eq('id', poi.id);
 
       final updated = List<TacticalPoi>.from(poisNotifier.value);
       final index = updated.indexWhere((p) => p.id == poi.id);
@@ -337,7 +358,7 @@ class LocationService {
         poisNotifier.value = updated;
       }
     } catch (e) {
-      debugPrint('⚠️ [LocationService] Error al actualizar atalaya en Supabase: $e');
+      debugPrint('⚠️ [LocationService] Error al actualizar destino turístico en Supabase: $e');
       final updated = List<TacticalPoi>.from(poisNotifier.value);
       final index = updated.indexWhere((p) => p.id == poi.id);
       if (index != -1) {
@@ -354,17 +375,89 @@ class LocationService {
       final updated = List<TacticalPoi>.from(poisNotifier.value)..removeWhere((p) => p.id == id);
       poisNotifier.value = updated;
     } catch (e) {
-      debugPrint('⚠️ [LocationService] Error al eliminar atalaya en Supabase: $e');
+      debugPrint('⚠️ [LocationService] Error al eliminar destino en Supabase: $e');
       final updated = List<TacticalPoi>.from(poisNotifier.value)..removeWhere((p) => p.id == id);
       poisNotifier.value = updated;
     }
   }
 
-  /// Obtiene la ruta entre dos puntos vía API OSRM pública, con fallback geodésico si falla la conexión
+  /// Obtiene la ruta entre dos puntos con consideración de tráfico vehicular (TomTom Routing o OSRM + Modelo de Congestión SV)
   Future<TacticalRouteResult> calculateRoute({
     required LatLng start,
     required LatLng destination,
+    bool trafficEnabled = false,
   }) async {
+    // 1. Intentar TomTom Routing API si la clave está configurada
+    if (Environment.tomtomApiKey.isNotEmpty &&
+        Environment.tomtomApiKey != 'YOUR_TOMTOM_KEY') {
+      try {
+        final tomtomUri = Uri.parse(
+          'https://api.tomtom.com/routing/1/calculateRoute/'
+          '${start.latitude},${start.longitude}:${destination.latitude},${destination.longitude}'
+          '/json?key=${Environment.tomtomApiKey}&traffic=true&computeTravelTimeFor=all',
+        );
+
+        final tomtomResponse =
+            await http.get(tomtomUri).timeout(const Duration(seconds: 4));
+        if (tomtomResponse.statusCode == 200) {
+          final data = jsonDecode(tomtomResponse.body) as Map<String, dynamic>;
+          final routes = data['routes'] as List?;
+          if (routes != null && routes.isNotEmpty) {
+            final firstRoute = routes.first as Map<String, dynamic>;
+            final summary = firstRoute['summary'] as Map<String, dynamic>?;
+            final legs = firstRoute['legs'] as List?;
+
+            if (summary != null && legs != null && legs.isNotEmpty) {
+              final lengthMeters =
+                  (summary['lengthInMeters'] as num?)?.toDouble() ?? 0.0;
+              final travelTimeSec =
+                  (summary['travelTimeInSeconds'] as num?)?.toInt() ?? 0;
+              final noTrafficSec =
+                  (summary['noTrafficTravelTimeInSeconds'] as num?)?.toInt() ??
+                      travelTimeSec;
+              final trafficDelaySec =
+                  (summary['trafficDelayInSeconds'] as num?)?.toInt() ?? 0;
+
+              final legPoints =
+                  legs.first['points'] as List<dynamic>? ?? <dynamic>[];
+              final points = legPoints.map<LatLng>((p) {
+                final map = p as Map<String, dynamic>;
+                return LatLng(
+                  (map['latitude'] as num).toDouble(),
+                  (map['longitude'] as num).toDouble(),
+                );
+              }).toList();
+
+              if (points.isNotEmpty) {
+                final delayMin = (trafficDelaySec / 60.0).round();
+                final level = _evaluateTrafficLevel(
+                  baseSeconds: noTrafficSec,
+                  delayMinutes: delayMin,
+                );
+
+                return TacticalRouteResult(
+                  points: points,
+                  distanceKm: lengthMeters / 1000.0,
+                  baseDuration: Duration(seconds: noTrafficSec),
+                  estimatedDuration: Duration(seconds: travelTimeSec),
+                  trafficDelayMinutes: delayMin,
+                  trafficLevel: level,
+                  trafficConditionText: _trafficConditionDescription(
+                    level,
+                    delayMin,
+                  ),
+                  isRealRoute: true,
+                );
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('ℹ️ [LocationService] TomTom Routing no disponible ($e). Pasando a OSRM.');
+      }
+    }
+
+    // 2. Ruta vial vía OSRM con aplicación del Modelo de Congestión Vial de El Salvador
     try {
       final url = Uri.parse(
         'https://router.project-osrm.org/route/v1/driving/'
@@ -389,45 +482,196 @@ class LocationService {
               return LatLng((pair[1] as num).toDouble(), (pair[0] as num).toDouble());
             }).toList();
 
+            final baseSeconds = durationSeconds.round();
+            final trafficFactor = _calculateElSalvadorTrafficFactor(
+              start: start,
+              destination: destination,
+              trafficLayerActive: trafficEnabled,
+            );
+
+            final effectiveSeconds = (baseSeconds * trafficFactor).round();
+            final delaySeconds = effectiveSeconds - baseSeconds;
+            final delayMinutes = (delaySeconds / 60.0).round();
+
+            final level = _evaluateTrafficLevel(
+              baseSeconds: baseSeconds,
+              delayMinutes: delayMinutes,
+            );
+
             return TacticalRouteResult(
               points: points,
               distanceKm: distanceMeters / 1000.0,
-              estimatedDuration: Duration(seconds: durationSeconds.round()),
+              baseDuration: Duration(seconds: baseSeconds),
+              estimatedDuration: Duration(seconds: effectiveSeconds),
+              trafficDelayMinutes: delayMinutes,
+              trafficLevel: level,
+              trafficConditionText: _trafficConditionDescription(level, delayMinutes),
               isRealRoute: true,
             );
           }
         }
       }
     } catch (e) {
-      debugPrint('ℹ️ [LocationService] OSRM no disponible ($e). Usando cálculo geodésico directo.');
+      debugPrint('ℹ️ [LocationService] OSRM no disponible ($e). Usando cálculo geodésico.');
     }
 
-    // Fallback: Línea geodésica directa y cálculo de distancia / tiempo estimado (velocidad media 50 km/h)
+    // 3. Fallback geodésico (Cálculo sin conexión con factor de sinuosidad vial de El Salvador)
     const distanceCalculator = Distance();
     final distanceMeters = distanceCalculator.as(LengthUnit.Meter, start, destination);
     final distanceKm = distanceMeters / 1000.0;
-    final travelMinutes = ((distanceKm / 50.0) * 60.0).round().clamp(1, 9999);
+    final estimatedRoadKm = distanceKm * 1.30;
+    final baseMinutes = ((estimatedRoadKm / 50.0) * 60.0).round().clamp(1, 9999);
+
+    final trafficFactor = _calculateElSalvadorTrafficFactor(
+      start: start,
+      destination: destination,
+      trafficLayerActive: trafficEnabled,
+    );
+    final effectiveMinutes = (baseMinutes * trafficFactor).round().clamp(1, 9999);
+    final delayMinutes = effectiveMinutes - baseMinutes;
+    final level = _evaluateTrafficLevel(
+      baseSeconds: baseMinutes * 60,
+      delayMinutes: delayMinutes,
+    );
 
     return TacticalRouteResult(
       points: [start, destination],
-      distanceKm: distanceKm,
-      estimatedDuration: Duration(minutes: travelMinutes),
+      distanceKm: estimatedRoadKm,
+      baseDuration: Duration(minutes: baseMinutes),
+      estimatedDuration: Duration(minutes: effectiveMinutes),
+      trafficDelayMinutes: delayMinutes,
+      trafficLevel: level,
+      trafficConditionText: _trafficConditionDescription(level, delayMinutes),
       isRealRoute: false,
     );
   }
+
+  /// Modelo Dinámico de Tráfico Vehicular para El Salvador (Zona Horaria UTC-6)
+  static double _calculateElSalvadorTrafficFactor({
+    required LatLng start,
+    required LatLng destination,
+    required bool trafficLayerActive,
+  }) {
+    final svTime = DateTime.now().toUtc().subtract(const Duration(hours: 6));
+    final hour = svTime.hour;
+    final minute = svTime.minute;
+    final weekday = svTime.weekday; // 1 = Lunes, 7 = Domingo
+    final timeDec = hour + (minute / 60.0);
+
+    // ¿Ruta atraviesa el Área Metropolitana de San Salvador (AMSS)?
+    final inAmss = (start.latitude >= 13.63 && start.latitude <= 13.76 &&
+            start.longitude >= -89.32 && start.longitude <= -89.13) ||
+        (destination.latitude >= 13.63 && destination.latitude <= 13.76 &&
+            destination.longitude >= -89.32 && destination.longitude <= -89.13);
+
+    // ¿Ruta hacia/desde Surf City / La Libertad?
+    final isBeachCorridor = (start.latitude <= 13.55 || destination.latitude <= 13.55);
+
+    double factor = 1.05;
+
+    if (weekday >= 1 && weekday <= 5) {
+      // DÍAS LABORABLES (Lunes a Viernes)
+      if (timeDec >= 6.5 && timeDec <= 8.75) {
+        // Hora pico matutina (6:30 AM - 8:45 AM)
+        factor = inAmss ? 1.55 : 1.30;
+      } else if (timeDec >= 11.75 && timeDec <= 13.5) {
+        // Almuerzo (11:45 AM - 1:30 PM)
+        factor = inAmss ? 1.25 : 1.15;
+      } else if (timeDec >= 16.5 && timeDec <= 19.5) {
+        // Hora pico vespertina (4:30 PM - 7:30 PM)
+        factor = inAmss ? 1.60 : 1.35;
+      } else if (timeDec >= 8.75 && timeDec <= 16.5) {
+        // Horas diurnas estándar
+        factor = inAmss ? 1.18 : 1.10;
+      } else {
+        // Noche / Madrugada
+        factor = 1.02;
+      }
+    } else if (weekday == 6) {
+      // SÁBADOS
+      if (timeDec >= 10.5 && timeDec <= 14.5) {
+        factor = inAmss ? 1.35 : 1.20;
+      } else if (isBeachCorridor && timeDec >= 9.0 && timeDec <= 14.0) {
+        factor = 1.40;
+      } else {
+        factor = 1.10;
+      }
+    } else {
+      // DOMINGOS
+      if (isBeachCorridor && timeDec >= 15.5 && timeDec <= 19.5) {
+        factor = 1.45;
+      } else if (timeDec >= 16.0 && timeDec <= 19.0 && inAmss) {
+        factor = 1.20;
+      } else {
+        factor = 1.05;
+      }
+    }
+
+    if (trafficLayerActive && factor == 1.05) {
+      factor = 1.08;
+    }
+
+    return factor;
+  }
+
+  static TrafficCongestionLevel _evaluateTrafficLevel({
+    required int baseSeconds,
+    required int delayMinutes,
+  }) {
+    if (delayMinutes <= 2) {
+      return TrafficCongestionLevel.freeFlow;
+    } else if (delayMinutes <= 9) {
+      return TrafficCongestionLevel.moderate;
+    } else {
+      return TrafficCongestionLevel.heavy;
+    }
+  }
+
+  static String _trafficConditionDescription(
+    TrafficCongestionLevel level,
+    int delayMinutes,
+  ) {
+    switch (level) {
+      case TrafficCongestionLevel.freeFlow:
+        return 'Flujo Libre';
+      case TrafficCongestionLevel.moderate:
+        return delayMinutes > 0
+            ? 'Tráfico Moderado (+$delayMinutes min)'
+            : 'Tráfico Moderado';
+      case TrafficCongestionLevel.heavy:
+        return delayMinutes > 0
+            ? 'Tráfico Lento (+$delayMinutes min)'
+            : 'Tráfico Lento';
+    }
+  }
 }
 
-/// Resultado del cálculo de ruta táctica
+/// Nivel de congestión del tráfico vehicular
+enum TrafficCongestionLevel {
+  freeFlow, // Flujo Libre (Verde)
+  moderate, // Tráfico Moderado (Ámbar / Naranja)
+  heavy, // Tráfico Lento / Congestión (Rojo)
+}
+
+/// Resultado del cálculo de ruta con análisis de tráfico
 class TacticalRouteResult {
   final List<LatLng> points;
   final double distanceKm;
-  final Duration estimatedDuration;
+  final Duration estimatedDuration; // Tiempo estimado considerando tráfico
+  final Duration baseDuration; // Tiempo ideal sin tráfico
+  final int trafficDelayMinutes; // Minutos adicionales por congestión
+  final TrafficCongestionLevel trafficLevel;
+  final String trafficConditionText;
   final bool isRealRoute;
 
   const TacticalRouteResult({
     required this.points,
     required this.distanceKm,
     required this.estimatedDuration,
+    required this.baseDuration,
+    this.trafficDelayMinutes = 0,
+    this.trafficLevel = TrafficCongestionLevel.freeFlow,
+    this.trafficConditionText = 'Flujo Libre',
     required this.isRealRoute,
   });
 
@@ -440,6 +684,38 @@ class TacticalRouteResult {
       return '${hours}h ${minutes}m';
     }
     return '$minutes min';
+  }
+
+  String get formattedTrafficDuration {
+    final hours = estimatedDuration.inHours;
+    final minutes = estimatedDuration.inMinutes % 60;
+    final timeStr = hours > 0 ? '${hours}h ${minutes}m' : '$minutes min';
+    if (trafficDelayMinutes > 0) {
+      return '$timeStr ($trafficLevelLabel)';
+    }
+    return '$timeStr (flujo libre)';
+  }
+
+  String get trafficLevelLabel {
+    switch (trafficLevel) {
+      case TrafficCongestionLevel.freeFlow:
+        return 'Flujo Libre';
+      case TrafficCongestionLevel.moderate:
+        return 'Tráfico Moderado';
+      case TrafficCongestionLevel.heavy:
+        return 'Tráfico Lento';
+    }
+  }
+
+  Color get trafficColor {
+    switch (trafficLevel) {
+      case TrafficCongestionLevel.freeFlow:
+        return const Color(0xFF2ECC71); // Verde esmeralda (#2ECC71)
+      case TrafficCongestionLevel.moderate:
+        return const Color(0xFFF39C12); // Ámbar / Naranja dorado (#F39C12)
+      case TrafficCongestionLevel.heavy:
+        return const Color(0xFFE74C3C); // Rojo carmesí (#E74C3C)
+    }
   }
 }
 

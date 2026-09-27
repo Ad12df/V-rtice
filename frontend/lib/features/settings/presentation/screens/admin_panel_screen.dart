@@ -12,7 +12,7 @@ import 'package:vertice/features/map/services/location_service.dart';
 /// Provee 4 módulos de mando:
 /// 1. OPERADORES: Nómina táctica y control de suspensiones/baneos en tiempo real.
 /// 2. EVENTOS: Gestión CRUD de la Agenda Táctica de El Salvador.
-/// 3. ATALAYAS: Gestión CRUD de Puntos de Interés / Atalayas con Supabase.
+/// 3. DESTINOS: Gestión CRUD de Destinos Turísticos con Supabase.
 /// 4. ESTADÍSTICAS: Métricas consolidadas del sistema y desglose territorial por departamento.
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -152,7 +152,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Error al sincronizar operadores: $e';
+        _errorMessage = 'Error al sincronizar usuarios: $e';
       });
     }
   }
@@ -230,8 +230,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           children: [
             Text(
               willBan
-                  ? '¿Confirmas la suspensión inmediata del operador @${targetUser.username ?? targetUser.id}?'
-                  : '¿Confirmas la reactivación del acceso al operador @${targetUser.username ?? targetUser.id}?',
+                  ? '¿Confirmas la suspensión inmediata del usuario @${targetUser.username ?? targetUser.id}?'
+                  : '¿Confirmas la reactivación del acceso al usuario @${targetUser.username ?? targetUser.id}?',
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13,
@@ -253,8 +253,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   Expanded(
                     child: Text(
                       willBan
-                          ? 'El operador no podrá iniciar sesión ni acceder al mapa.'
-                          : 'El operador podrá volver a sincronizar enlaces y datos.',
+                          ? 'El usuario no podrá iniciar sesión ni acceder al mapa.'
+                          : 'El usuario podrá volver a acceder a la plataforma.',
                       style: TextStyle(
                         color: actionColor,
                         fontSize: 11,
@@ -307,7 +307,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
         context,
         title: willBan ? 'ACCESO SUSPENDIDO' : 'ACCESO REACTIVADO',
         message:
-            'El estado del operador @${targetUser.username ?? "usuario"} ha sido actualizado en la red.',
+            'El estado del usuario @${targetUser.username ?? "usuario"} ha sido actualizado en la plataforma.',
         type: willBan ? AlertType.warning : AlertType.success,
       );
     } catch (e) {
@@ -357,7 +357,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               side: const BorderSide(color: AppColors.cyan, width: 1.2),
             ),
             title: Text(
-              isEditing ? 'EDITAR EVENTO TÁCTICO' : 'NUEVO EVENTO TÁCTICO',
+              isEditing ? 'EDITAR EVENTO TURÍSTICO' : 'NUEVO EVENTO TURÍSTICO',
               style: const TextStyle(
                 color: AppColors.cyan,
                 fontSize: 14,
@@ -377,6 +377,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                       label: 'Categoría',
                       value: selectedCategory,
                       items: const [
+                        'EXCURSIÓN / AVENTURA',
                         'EXPEDICIÓN TÁCTICA',
                         'FESTIVAL CULTURAL',
                         'COMPETENCIA DEPORTIVA',
@@ -428,7 +429,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _buildTextField(descCtrl, 'Descripción Táctica', Icons.description_rounded, maxLines: 3),
+                    _buildTextField(descCtrl, 'Descripción del Evento', Icons.description_rounded, maxLines: 3),
                   ],
                 ),
               ),
@@ -470,7 +471,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                     priceAmount: priceAmount,
                     status: selectedStatus,
                     description: descCtrl.text.trim().isEmpty
-                        ? 'Operación táctica programada en territorio de El Salvador.'
+                        ? 'Evento turístico programado en El Salvador.'
                         : descCtrl.text.trim(),
                     icon: Icons.event_rounded,
                   );
@@ -501,14 +502,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // DIÁLOGOS DE GESTIÓN DE PUNTOS DE INTERÉS / ATALAYAS
+  // DIÁLOGOS DE GESTIÓN DE DESTINOS TURÍSTICOS
   // ══════════════════════════════════════════════════════════════════════
 
   Future<void> _showPoiFormDialog({TacticalPoi? poiToEdit}) async {
     final isEditing = poiToEdit != null;
     final nameCtrl = TextEditingController(text: poiToEdit?.name ?? '');
     final descCtrl = TextEditingController(text: poiToEdit?.description ?? '');
-    final catCtrl = TextEditingController(text: poiToEdit?.category ?? 'ATALAYA NATURAL');
+    final catCtrl = TextEditingController(text: poiToEdit?.category ?? 'PARQUE NACIONAL / VOLCÁN');
     final latCtrl = TextEditingController(
         text: poiToEdit?.location.latitude.toString() ?? '13.6983');
     final lngCtrl = TextEditingController(
@@ -530,7 +531,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               side: const BorderSide(color: AppColors.cyan, width: 1.2),
             ),
             title: Text(
-              isEditing ? 'EDITAR ATALAYA / POI' : 'NUEVA ATALAYA / POI',
+              isEditing ? 'EDITAR DESTINO TURÍSTICO' : 'NUEVO DESTINO TURÍSTICO',
               style: const TextStyle(
                 color: AppColors.cyan,
                 fontSize: 14,
@@ -546,7 +547,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   children: [
                     _buildTextField(nameCtrl, 'Nombre del Sitio Turístico', Icons.place_rounded),
                     const SizedBox(height: 10),
-                    _buildTextField(catCtrl, 'Categoría Táctica', Icons.category_rounded),
+                    _buildTextField(catCtrl, 'Categoría del Destino', Icons.category_rounded),
                     const SizedBox(height: 10),
                     _buildDropdown<String>(
                       label: 'Departamento (14 Deptos)',
@@ -570,7 +571,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                     ),
                     const SizedBox(height: 10),
                     _buildDropdown<String>(
-                      label: 'Dificultad de Acceso',
+                      label: 'Nivel de Exigencia / Acceso',
                       value: selectedDiff,
                       items: difficulties,
                       onChanged: (v) => setDialogState(() => selectedDiff = v!),
@@ -626,10 +627,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   final newPoi = TacticalPoi(
                     id: poiToEdit?.id ?? 'poi-${DateTime.now().millisecondsSinceEpoch}',
                     name: name,
-                    category: catCtrl.text.trim().isEmpty ? 'ATALAYA' : catCtrl.text.trim().toUpperCase(),
+                    category: catCtrl.text.trim().isEmpty ? 'DESTINO TURÍSTICO' : catCtrl.text.trim().toUpperCase(),
                     location: LatLng(lat, lng),
                     description: descCtrl.text.trim().isEmpty
-                        ? 'Punto de interés turístico y atalaya en El Salvador.'
+                        ? 'Punto de interés turístico en El Salvador.'
                         : descCtrl.text.trim(),
                     difficulty: selectedDiff,
                     icon: Icons.castle_rounded,
@@ -651,12 +652,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   if (!mounted) return;
                   TacticalAlert.show(
                     context,
-                    title: isEditing ? 'ATALAYA ACTUALIZADA' : 'ATALAYA REGISTRADA',
+                    title: isEditing ? 'DESTINO ACTUALIZADO' : 'DESTINO REGISTRADO',
                     message: 'El punto de interés ha sido sincronizado con Supabase.',
                     type: AlertType.success,
                   );
                 },
-                child: Text(isEditing ? 'GUARDAR CAMBIOS' : 'REGISTRAR ATALAYA'),
+                child: Text(isEditing ? 'GUARDAR CAMBIOS' : 'REGISTRAR DESTINO'),
               ),
             ],
           );
@@ -684,7 +685,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'GEOTURISMO // PANEL ADMIN',
+              'NEXT TRIP // PANEL ADMIN',
               style: TextStyle(
                 color: AppColors.cyan,
                 fontSize: 13,
@@ -693,7 +694,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               ),
             ),
             Text(
-              'ADMINISTRACIÓN TÁCTICA // EL SALVADOR',
+              'PANEL DE ADMINISTRACIÓN // v1.4.0 (beta)',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 9,
@@ -717,9 +718,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             fontFamily: 'monospace',
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.people_alt_rounded, size: 18), text: 'OPERADORES'),
+            Tab(icon: Icon(Icons.people_alt_rounded, size: 18), text: 'USUARIOS'),
             Tab(icon: Icon(Icons.event_note_rounded, size: 18), text: 'EVENTOS'),
-            Tab(icon: Icon(Icons.castle_rounded, size: 18), text: 'ATALAYAS'),
+            Tab(icon: Icon(Icons.castle_rounded, size: 18), text: 'DESTINOS'),
             Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'ESTADÍSTICAS'),
           ],
         ),
@@ -731,7 +732,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           _buildOperatorsTab(),
           // Tab 1: Gestión de Eventos Tácticos
           _buildEventsTab(),
-          // Tab 2: Gestión de Atalayas / Puntos de Interés
+          // Tab 2: Gestión de Destinos Turísticos
           _buildPoisTab(),
           // Tab 3: Estadísticas del Sistema y Desglose por Departamento
           _buildStatisticsTab(),
@@ -802,7 +803,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
               cursorColor: AppColors.cyan,
               decoration: InputDecoration(
-                hintText: 'Filtrar operador por nombre, @username o correo...',
+                hintText: 'Filtrar usuario por nombre, @username o correo...',
                 hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.cyan, size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -833,7 +834,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
           else if (_errorMessage != null)
             _buildErrorBox(_errorMessage!)
           else if (_filteredProfiles.isEmpty)
-            _buildEmptyBox('NO SE ENCONTRARON OPERADORES')
+            _buildEmptyBox('NO SE ENCONTRARON USUARIOS')
           else
             ListView.separated(
               shrinkWrap: true,
@@ -1019,7 +1020,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // TAB 2: ATALAYAS / POIS
+  // TAB 2: DESTINOS TURÍSTICOS
   // ══════════════════════════════════════════════════════════════════════
 
   Widget _buildPoisTab() {
@@ -1033,7 +1034,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'ATALAYAS DISPONIBLES: ${pois.length}',
+                  'DESTINOS DISPONIBLES: ${pois.length}',
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 10,
@@ -1051,7 +1052,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                   ),
                   icon: const Icon(Icons.add_location_alt_rounded, size: 18),
                   label: const Text(
-                    'NUEVA ATALAYA',
+                    'NUEVO DESTINO',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
                   ),
                   onPressed: () => _showPoiFormDialog(),
@@ -1140,7 +1141,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${poi.category} · ${poi.priceRange} · DIF: ${poi.difficulty}',
+                  '${poi.category} · ${poi.department} · ${poi.priceRange}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 10.5,
@@ -1156,12 +1157,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             children: [
               IconButton(
                 icon: const Icon(Icons.edit_rounded, color: AppColors.cyan, size: 20),
-                tooltip: 'Editar Atalaya',
+                tooltip: 'Editar Destino',
                 onPressed: () => _showPoiFormDialog(poiToEdit: poi),
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
-                tooltip: 'Eliminar Atalaya',
+                tooltip: 'Eliminar Destino',
                 onPressed: () async {
                   final confirm = await _showDeleteConfirmation(poi.name);
                   if (confirm == true) {
@@ -1238,7 +1239,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             const SizedBox(width: 10),
             Expanded(
               child: _buildMetricCard(
-                title: 'ATALAYAS',
+                title: 'DESTINOS',
                 value: pois.length.toString(),
                 icon: Icons.castle_rounded,
                 accentColor: AppColors.success,
@@ -1260,7 +1261,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'ESTADO DE NÓMINA OPERATIVA',
+                'ESTADO DE CUENTAS DE USUARIOS',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 11,
@@ -1273,9 +1274,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Operadores Activos: $activeUsers',
+                  Text('Usuarios Activos: $activeUsers',
                       style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Operadores Suspendidos: $bannedUsers',
+                  Text('Usuarios Suspendidos: $bannedUsers',
                       style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -1295,7 +1296,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
 
         // Desglose Territorial por los 14 Departamentos
         const Text(
-          'DISTRIBUCIÓN DE ATALAYAS POR DEPARTAMENTO (EL SALVADOR)',
+          'DISTRIBUCIÓN DE DESTINOS POR DEPARTAMENTO (EL SALVADOR)',
           style: TextStyle(
             color: AppColors.cyan,
             fontSize: 11,
@@ -1374,7 +1375,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
     final isBanned = profile.isBanned;
     final isAdmin = profile.isAdmin;
 
-    final displayName = profile.fullName ?? profile.username ?? 'Operador';
+    final displayName = profile.fullName ?? profile.username ?? 'Usuario';
     final username = profile.username ?? '—';
     final email = profile.email ?? '—';
 
@@ -1488,7 +1489,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
                         ),
                       ),
                       child: Text(
-                        isAdmin ? '[ADMIN]' : '[OPERADOR]',
+                        isAdmin ? '[ADMIN]' : '[USUARIO]',
                         style: TextStyle(
                           color: isAdmin ? AppColors.cyan : AppColors.textMuted,
                           fontSize: 9,

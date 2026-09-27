@@ -396,7 +396,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     CustomTextField(
                       controller: recoveryEmailController,
                       label: 'Correo de Enlace',
-                      hint: 'agente@vertice.sv',
+                      hint: 'viajero@nexttrip.sv',
                       prefixIcon: Icons.alternate_email_rounded,
                       keyboardType: TextInputType.emailAddress,
                       validator: (val) {
@@ -622,7 +622,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         ),
         const SizedBox(height: 16),
         Text(
-          'GEOTURISMO',
+          'NEXT TRIP',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: isCompact ? 24 : 30,
@@ -842,7 +842,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           CustomTextField(
             controller: _loginEmailController,
             label: 'Identificador / Correo',
-            hint: 'agente@vertice.sv',
+            hint: 'viajero@nexttrip.sv',
             prefixIcon: Icons.alternate_email_rounded,
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
@@ -1034,7 +1034,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           CustomTextField(
             controller: _registerEmailController,
             label: 'Correo de Enlace',
-            hint: 'agente@vertice.sv',
+            hint: 'viajero@nexttrip.sv',
             prefixIcon: Icons.mail_outline_rounded,
             keyboardType: TextInputType.emailAddress,
             validator: (value) {

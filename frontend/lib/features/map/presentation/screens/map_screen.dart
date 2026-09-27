@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:vertice/core/constants/app_colors.dart';
+import 'package:vertice/core/constants/environment.dart';
 import 'package:vertice/core/utils/responsive.dart';
 import 'package:vertice/features/auth/presentation/widgets/custom_button.dart';
 import 'package:vertice/features/auth/services/auth_service.dart';
@@ -12,6 +12,7 @@ import 'package:vertice/features/map/presentation/widgets/add_location_modal.dar
 import 'package:vertice/features/map/presentation/widgets/advanced_search_modal.dart';
 import 'package:vertice/features/map/services/location_service.dart';
 import 'package:vertice/features/map/services/map_cache_service.dart';
+import 'package:vertice/features/map/services/traffic_network_service.dart';
 
 class MapScreen extends StatefulWidget {
   /// Controla si el sensor GPS está activo. Cuando es false, no se realizan
@@ -45,7 +46,14 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
 
   bool _isFogActive = false;
   bool _showTelemetry = true;
+  bool _showTrafficLayer = true;
   TacticalPoi? _selectedPoi;
+
+  // Notificación flotante superior táctica (Highest z-index con descarte manual '✕')
+  String? _floatingBannerText;
+  IconData? _floatingBannerIcon;
+  Color? _floatingBannerColor;
+  Timer? _floatingBannerTimer;
 
   // Estado de Ruta Táctica Dinámica (OSRM con fallback geodésico)
   bool _isRouteActive = false;
@@ -65,6 +73,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
   // Coordenadas tácticas centrales de El Salvador
   static const LatLng _centerElSalvador = LatLng(13.7942, -88.8965);
   static const double _initialZoom = 8.8;
+  double _currentZoom = _initialZoom;
 
   // Delimitación geográfica estricta de El Salvador (Suroeste y Noreste)
   static final LatLngBounds _elSalvadorBounds = LatLngBounds(
@@ -105,50 +114,41 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
     }
   }
 
-  bool get _isAdmin => _userProfile?.role == 'admin';
-
-  Future<void> _openAddLocationModal(LatLng point) async {
-    if (!_isAdmin) return;
-
-    final createdPoi = await AddLocationModal.show(
-      context,
-      initialCoordinates: point,
-    );
-
-    if (createdPoi != null && mounted) {
-      await _loadLocations();
-      setState(() {
-        _selectedPoi = createdPoi;
-      });
-      _mapController.move(createdPoi.location, 14.5);
-    }
+  /// Muestra una notificación flotante en la capa superior (z-index más alto)
+  /// con temporizador automático y botón manual '✕' para cerrarla de inmediato.
+  void _showFloatingBanner({
+    required String text,
+    IconData icon = Icons.info_outline_rounded,
+    Color color = AppColors.cyan,
+    Duration duration = const Duration(seconds: 4),
+  }) {
+    _floatingBannerTimer?.cancel();
+    setState(() {
+      _floatingBannerText = text;
+      _floatingBannerIcon = icon;
+      _floatingBannerColor = color;
+    });
+    _floatingBannerTimer = Timer(duration, () {
+      if (mounted) {
+        setState(() {
+          _floatingBannerText = null;
+          _floatingBannerIcon = null;
+          _floatingBannerColor = null;
+        });
+      }
+    });
   }
 
-  Future<void> _captureCurrentLocationAsPoi() async {
-    if (!_isAdmin) return;
-
-    LatLng targetCoords;
-    if (_userLocation != null) {
-      targetCoords = _userLocation!;
-    } else {
-      setState(() => _isLocatingUser = true);
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 8),
-          ),
-        );
-        targetCoords = LatLng(pos.latitude, pos.longitude);
-      } catch (_) {
-        targetCoords = const LatLng(13.6983, -89.1914);
-      } finally {
-        if (mounted) setState(() => _isLocatingUser = false);
-      }
+  /// Descarta manualmente de inmediato la notificación flotante
+  void _dismissFloatingBanner() {
+    _floatingBannerTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _floatingBannerText = null;
+        _floatingBannerIcon = null;
+        _floatingBannerColor = null;
+      });
     }
-
-    if (!mounted) return;
-    await _openAddLocationModal(targetCoords);
   }
 
   Future<void> _loadLocations() async {
@@ -187,6 +187,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
 
   @override
   void dispose() {
+    _floatingBannerTimer?.cancel();
     _locationService.poisNotifier.removeListener(_onPoisNotifierChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -199,16 +200,10 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
   /// con un nivel de zoom táctico (15.0).
   void recenterOnUser() {
     if (!widget.gpsEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.surfaceElevated,
-          content: const Text(
-            'GPS desactivado en ajustes. Actívalo para rastrear tu posición.',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      _showFloatingBanner(
+        text: 'GPS desactivado en ajustes. Actívalo para rastrear tu posición.',
+        icon: Icons.location_off_rounded,
+        color: Colors.amber,
       );
       return;
     }
@@ -230,11 +225,11 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
           (p.location.longitude - coords.longitude).abs() < 0.001,
       orElse: () => TacticalPoi(
         id: 'event-${DateTime.now().millisecondsSinceEpoch}',
-        name: name ?? 'OBJETIVO TÁCTICO',
-        category: 'EVENTO / OPERACIÓN',
+        name: name ?? 'Destino Turístico',
+        category: 'EVENTO / AGENDA',
         location: coords,
-        description: 'Coordenadas del evento táctico en El Salvador.',
-        difficulty: 'TERRENO',
+        description: 'Coordenadas del destino turístico en El Salvador.',
+        difficulty: 'MEDIA',
         icon: Icons.event_available_rounded,
       ),
     );
@@ -258,10 +253,6 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
       }
       if (_filterCriteria.selectedPriceRange != null &&
           poi.priceRange != _filterCriteria.selectedPriceRange) {
-        return false;
-      }
-      if (_filterCriteria.selectedDifficulty != null &&
-          poi.difficulty != _filterCriteria.selectedDifficulty) {
         return false;
       }
       return true;
@@ -563,6 +554,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
     final result = await _locationService.calculateRoute(
       start: startPoint,
       destination: destination.location,
+      trafficEnabled: _showTrafficLayer,
     );
 
     if (mounted) {
@@ -591,44 +583,15 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
         _mapController.move(destination.location, 13.0);
       }
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.surfaceElevated,
-          duration: const Duration(seconds: 4),
-          content: Row(
-            children: [
-              const Icon(Icons.alt_route_rounded, color: AppColors.goldenOrange, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'RUTA TÁCTICA // ${result.isRealRoute ? "OSRM VIAL REAL" : "LÍNEA GEODÉSICA DIRECTA"}',
-                      style: const TextStyle(
-                        color: AppColors.goldenOrange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10.5,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    Text(
-                      'Destino: ${destination.name} (${result.formattedDistance} • ETA: ${result.formattedDuration})',
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      _showFloatingBanner(
+        text: 'Ruta trazada hacia ${destination.name}: ${result.formattedDistance} (${result.formattedTrafficDuration})',
+        icon: Icons.alt_route_rounded,
+        color: result.trafficColor,
       );
     }
   }
 
-  /// Cancela la ruta táctica activa
+  /// Cancela la ruta activa
   void _cancelRoute() {
     setState(() {
       _isRouteActive = false;
@@ -636,44 +599,46 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
       _currentRouteResult = null;
       _routeDestinationPoi = null;
     });
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        backgroundColor: AppColors.surfaceElevated,
-        content: Text(
-          'Ruta táctica cancelada.',
-          style: TextStyle(color: AppColors.textMuted),
-        ),
-      ),
+    _showFloatingBanner(
+      text: 'Ruta activa cancelada',
+      icon: Icons.close_rounded,
+      color: AppColors.textMuted,
+      duration: const Duration(seconds: 2),
     );
   }
 
-  /// Abre la navegación externa por voz paso a paso en Google Maps / Waze
-  Future<void> _openExternalNavigation(LatLng destination) async {
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}',
+  bool get _isAdmin => _userProfile?.isAdmin ?? false;
+
+  /// Convierte un pin provisional en un Destino Turístico formal en Supabase (Exclusivo Administradores)
+  Future<void> _convertCustomPinToLocation(TacticalPoi poi) async {
+    Navigator.of(context, rootNavigator: false).pop();
+
+    final result = await AddLocationModal.show(
+      context,
+      initialCoordinates: poi.location,
+      initialName: poi.name.startsWith('Punto Marcado') ? null : poi.name,
     );
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        await launchUrl(uri);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.surfaceElevated,
-            content: Text(
-              'No se pudo abrir navegación externa: $e',
-              style: const TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        );
-      }
+
+    if (result != null && mounted) {
+      setState(() {
+        _customPines.removeWhere((p) => p.id == poi.id);
+      });
+      await _loadLocations();
+      if (!mounted) return;
+      setState(() {
+        _selectedPoi = result;
+      });
+      _mapController.move(result.location, 14.5);
+      _showPlaceDetails(result, AppColors.cyan, !Responsive.isMobile(context));
+      _showFloatingBanner(
+        text: '¡Destino turístico "${result.name}" registrado con éxito!',
+        icon: Icons.check_circle_rounded,
+        color: AppColors.cyan,
+      );
     }
   }
 
-  /// Manejador de toque en el mapa para añadir pines tácticos interactivos
+  /// Manejador de toque en el mapa para añadir marcadores interactivos
   void _onMapTap(TapPosition tapPosition, LatLng point) {
     if (_searchFocusNode.hasFocus) {
       _searchFocusNode.unfocus();
@@ -684,33 +649,22 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
 
     // Validar si el punto está dentro de El Salvador
     if (!_elSalvadorBounds.contains(point)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.surfaceElevated,
-          duration: Duration(seconds: 2),
-          content: Text(
-            '⚠️ Coordenada fuera de la jurisdicción táctica de El Salvador.',
-            style: TextStyle(color: Colors.amber),
-          ),
-        ),
+      _showFloatingBanner(
+        text: 'Coordenada fuera del territorio de El Salvador',
+        icon: Icons.warning_amber_rounded,
+        color: Colors.amber,
       );
-      return;
-    }
-
-    // Si es Administrador, abrir el modal de captura y registro para la coordenada seleccionada
-    if (_isAdmin) {
-      _openAddLocationModal(point);
       return;
     }
 
     final pinNumber = _customPines.length + 1;
     final newPin = TacticalPoi(
       id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
-      name: 'Punto Táctico #$pinNumber',
-      category: 'RECONOCIMIENTO DE CAMPO',
+      name: 'Punto Marcado #$pinNumber',
+      category: 'Punto de Interés Temporal',
       location: point,
-      description: 'Punto de interés táctico marcado por el operador en el terreno.',
-      difficulty: 'EXPLORACIÓN',
+      description: 'Punto de interés turístico marcado en el mapa.',
+      difficulty: 'MEDIA',
       icon: Icons.add_location_alt_rounded,
       isCustom: true,
     );
@@ -738,7 +692,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PIN AÑADIDO // DISTANCIA: $distanceText',
+                    'Punto Seleccionado • Distancia: $distanceText',
                     style: const TextStyle(
                       color: AppColors.locationBlue,
                       fontWeight: FontWeight.bold,
@@ -757,7 +711,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
           ],
         ),
         action: SnackBarAction(
-          label: 'INSPECCIONAR',
+          label: 'VER DETALLES',
           textColor: AppColors.locationBlue,
           onPressed: () => _showPlaceDetails(
             newPin,
@@ -886,7 +840,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'DISTANCIA AL OBJETIVO (DESDE OPERADOR):',
+                            'DISTANCIA AL DESTINO (DESDE TU POSICIÓN):',
                             style: TextStyle(
                               color: AppColors.locationBlue,
                               fontSize: 9.5,
@@ -931,7 +885,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
               ),
               const SizedBox(height: 16),
 
-              // Telemetría del Punto (Dificultad, Categoría)
+              // Información Territorial del Punto (Departamento, Categoría)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -946,12 +900,12 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'DIFICULTAD',
+                          'DEPARTAMENTO',
                           style: TextStyle(color: AppColors.textMuted, fontSize: 10, letterSpacing: 1),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          poi.difficulty,
+                          poi.department.isNotEmpty ? poi.department : 'El Salvador',
                           style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                       ],
@@ -976,10 +930,38 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
               ),
               const SizedBox(height: 20),
 
-              // Botones de Acción Táctica
+              // Botones de Acción
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Conversión de Pin Provisional a Destino Turístico (Exclusivo Administradores)
+                  if (poi.isCustom && _isAdmin) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.cyan,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 3,
+                        ),
+                        icon: const Icon(Icons.add_location_alt_rounded, size: 18, color: Colors.black),
+                        label: const Text(
+                          'AGREGAR COMO DESTINO TURÍSTICO',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        onPressed: () => _convertCustomPinToLocation(poi),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       if (poi.isCustom) ...[
@@ -1033,33 +1015,6 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Opción "Abrir en Google Maps / Waze" mediante url_launcher
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.goldenOrange,
-                        side: const BorderSide(color: AppColors.goldenOrange, width: 1.2),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      icon: const Icon(Icons.navigation_rounded, size: 16),
-                      label: const Text(
-                        'ABRIR EN GOOGLE MAPS / WAZE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      onPressed: () {
-                        _openExternalNavigation(poi.location);
-                      },
-                    ),
-                  ),
                 ],
               ),
             ],
@@ -1071,9 +1026,9 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
 );
   }
 
-  /// Construye el marcador dinámico táctico de alta visibilidad para la posición del operador.
+  /// Construye el marcador dinámico de alta visibilidad para la posición del usuario.
   Marker _buildOperatorMarker(LatLng location) {
-    final operatorName = _userProfile?.fullName ?? _userProfile?.username ?? 'OPERADOR';
+    final operatorName = _userProfile?.fullName ?? _userProfile?.username ?? 'MI POSICIÓN';
     return Marker(
       point: location,
       width: 110,
@@ -1221,11 +1176,15 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                 maxZoom: 17.0,
                 // Restricción de navegación estricta: No permite salirse de El Salvador
                 cameraConstraint: CameraConstraint.contain(bounds: _elSalvadorBounds),
-                // Toque interactivo para agregar nuevos pines de campo o atalayas admin
+                // Toque interactivo para agregar nuevos pines de campo o marcadores
                 onTap: (tapPosition, point) => _onMapTap(tapPosition, point),
-                onLongPress: (tapPosition, point) {
-                  if (_isAdmin && _elSalvadorBounds.contains(point)) {
-                    _openAddLocationModal(point);
+                onLongPress: (tapPosition, point) => _onMapTap(tapPosition, point),
+                onPositionChanged: (camera, hasGesture) {
+                  final newZoom = camera.zoom;
+                  if ((newZoom - _currentZoom).abs() >= 0.25) {
+                    setState(() {
+                      _currentZoom = newZoom;
+                    });
                   }
                 },
               ),
@@ -1262,6 +1221,33 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                   retinaMode: false,
                   tileProvider: MapCacheService.instance.tileProvider,
                 ),
+
+                // Capa Conmutable de Flujo Vial en Tiempo Real (Red Vial Abierta de El Salvador)
+                if (_showTrafficLayer) ...[
+                  // Red arterial y autopistas con carriles independientes y desplazamiento lateral según sentido
+                  PolylineLayer(
+                    key: const ValueKey('el_salvador_traffic_flow_layer'),
+                    polylines: TrafficNetworkService.instance.buildTrafficPolylines(zoom: _currentZoom),
+                  ),
+                  // Indicadores gráficos direccionales (chevrons en sentido del flujo vehicular a zoom >= 12.5)
+                  if (_currentZoom >= 12.5)
+                    MarkerLayer(
+                      key: const ValueKey('el_salvador_traffic_direction_arrows'),
+                      markers: TrafficNetworkService.instance.buildDirectionMarkers(zoom: _currentZoom),
+                    ),
+                  // Capa complementaria TomTom solo si hay una API Key configurada
+                  if (Environment.tomtomApiKey.isNotEmpty &&
+                      Environment.tomtomApiKey != 'YOUR_TOMTOM_KEY')
+                    TileLayer(
+                      key: const ValueKey('tomtom_traffic_flow_layer'),
+                      urlTemplate:
+                          'https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${Environment.tomtomApiKey}',
+                      userAgentPackageName: 'com.vertice.app',
+                      minZoom: 8.0,
+                      maxZoom: 18.0,
+                      panBuffer: 1,
+                    ),
+                ],
 
                 // Capa de Rutas Tácticas Orgánicas (PolylineLayer)
                 if (_isRouteActive && _tacticalRoutePoints.isNotEmpty)
@@ -1397,6 +1383,10 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                   else
                     _buildStatusChip(accentColor, isTabletOrLarger),
 
+                  // 3. Panel HUD Superior Persistente de Ruta Activa
+                  if (_isRouteActive && _routeDestinationPoi != null && _currentRouteResult != null)
+                    _buildTopActiveRoutePanel(accentColor, isTabletOrLarger),
+
                   if (_pois.isEmpty)
                     _buildEmptyStateBanner(isTabletOrLarger),
 
@@ -1466,7 +1456,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                                       ),
                                       const SizedBox(width: 10),
                                       Text(
-                                        'NIEBLA DE GUERRA ACTIVA',
+                                        'GUÍA CARTOGRÁFICA',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: AppColors.textPrimary,
@@ -1479,7 +1469,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                                   ),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Navegación restringida a El Salvador. Toca cualquier punto del mapa para colocar un pin táctico o inspecciona atalayas para ver distancias en vivo.',
+                                    'Navegación en El Salvador. Toca cualquier punto del mapa para colocar un marcador o selecciona un destino turístico para ver distancias y rutas.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: AppColors.textSecondary,
@@ -1489,7 +1479,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                                   ),
                                   const SizedBox(height: 16),
                                   CustomButton(
-                                    text: 'INICIAR EXPLORACIÓN LIBRE',
+                                    text: 'EXPLORAR DESTINOS',
                                     variant: ButtonVariant.primary,
                                     onPressed: () {
                                       setState(() {
@@ -1503,7 +1493,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                                               Icon(Icons.radar, color: accentColor, size: 20),
                                               const SizedBox(width: 10),
                                               const Text(
-                                                'Cartografía táctica libre desbloqueada.',
+                                                'Exploración de mapa activada.',
                                                 style: TextStyle(color: AppColors.textPrimary),
                                               ),
                                             ],
@@ -1521,78 +1511,6 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                     ),
 
                   const Spacer(),
-
-                  // Banner Flotante de Ruta Activa Táctica
-                  if (_isRouteActive && _routeDestinationPoi != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface.withValues(alpha: 0.96),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.goldenOrange, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.goldenOrange.withValues(alpha: 0.25),
-                            blurRadius: 14,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.alt_route_rounded, color: AppColors.goldenOrange, size: 22),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'RUTA: ${_routeDestinationPoi!.name.toUpperCase()}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.goldenOrange,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.8,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_currentRouteResult?.formattedDistance ?? ''} • ETA: ${_currentRouteResult?.formattedDuration ?? ''} (${_currentRouteResult?.isRealRoute == true ? "OSRM VIAL" : "DIRECTO"})',
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 10.5,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Botón Abrir en Google Maps / Waze
-                          IconButton(
-                            icon: const Icon(Icons.navigation_rounded, color: AppColors.cyan, size: 20),
-                            tooltip: 'Abrir en Google Maps / Waze',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _openExternalNavigation(_routeDestinationPoi!.location),
-                          ),
-                          const SizedBox(width: 12),
-                          // Botón Cancelar Ruta
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 20),
-                            tooltip: 'Cancelar Ruta',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: _cancelRoute,
-                          ),
-                        ],
-                      ),
-                    ),
 
                   if (_isCalculatingRoute)
                     Container(
@@ -1613,7 +1531,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                           ),
                           SizedBox(width: 10),
                           Text(
-                            'Calculando waypoints tácticos (OSRM)...',
+                            'Calculando ruta vial con tráfico...',
                             style: TextStyle(color: AppColors.textPrimary, fontSize: 11, fontFamily: 'monospace'),
                           ),
                         ],
@@ -1628,7 +1546,11 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                       decoration: BoxDecoration(
                         color: AppColors.surface.withValues(alpha: 0.94),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.surfaceBorder),
+                        border: Border.all(
+                          color: _isRouteActive && _currentRouteResult != null
+                              ? _currentRouteResult!.trafficColor.withValues(alpha: 0.6)
+                              : AppColors.surfaceBorder,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.5),
@@ -1642,9 +1564,9 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                           Expanded(
                             child: Text(
                               _selectedPoi != null
-                                  ? 'OBJETIVO: ${_selectedPoi!.name.toUpperCase()} ${currentDistanceText != null ? "[$currentDistanceText]" : ""}'
+                                  ? 'DESTINO: ${_selectedPoi!.name.toUpperCase()} ${currentDistanceText != null ? "[$currentDistanceText]" : ""}'
                                   : (_userLocation != null
-                                      ? 'OPERADOR: ${_userLocation!.latitude.toStringAsFixed(4)}° N, ${_userLocation!.longitude.toStringAsFixed(4)}° W'
+                                      ? 'TU POSICIÓN: ${_userLocation!.latitude.toStringAsFixed(4)}° N, ${_userLocation!.longitude.toStringAsFixed(4)}° W'
                                       : 'LAT: 13.7942° N | LON: 88.8965° W'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1663,7 +1585,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                           Text(
                             _customPines.isNotEmpty
                                 ? 'PINES: ${_customPines.length}'
-                                : (_isRouteActive ? 'RUTA: ACTIVA' : 'SV'),
+                                : 'SV',
                             style: TextStyle(
                               color: _selectedPoi != null
                                   ? AppColors.turquoise
@@ -1734,47 +1656,332 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
             ),
           ),
 
-          // 4. Botón Flotante Exclusivo para Administradores: Capturar Posición Actual
-          if (_isAdmin)
-            Positioned(
-              right: isTabletOrLarger ? 32 : 16,
-              bottom: isTabletOrLarger ? 90 : 76,
-              child: FloatingActionButton.extended(
-                heroTag: 'admin_capture_current_position_fab',
-                backgroundColor: AppColors.surface,
-                foregroundColor: AppColors.locationBlue,
-                elevation: 6,
-                highlightElevation: 10,
-                shape: RoundedRectangleBorder(
+          // 4. Botón Flotante Conmutable de Capa de Tráfico Vial en Tiempo Real
+          Positioned(
+            right: isTabletOrLarger ? 32 : 16,
+            bottom: isTabletOrLarger ? 90 : 76,
+            child: Material(
+              color: Colors.transparent,
+              child: Tooltip(
+                message: _showTrafficLayer ? 'Ocultar Tráfico Vial' : 'Mostrar Tráfico en Tiempo Real',
+                child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.turquoise, width: 1.5),
-                ),
-                onPressed: _isLocatingUser ? null : _captureCurrentLocationAsPoi,
-                icon: _isLocatingUser
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.turquoise,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.add_location_alt_rounded,
-                        color: AppColors.turquoise,
-                        size: 22,
+                  onTap: () {
+                    final nextState = !_showTrafficLayer;
+                    setState(() {
+                      _showTrafficLayer = nextState;
+                    });
+
+                    // Si hay una ruta activa, recalculamos de inmediato con el nuevo estado del tráfico
+                    if (_isRouteActive && _routeDestinationPoi != null && _userLocation != null) {
+                      _locationService.calculateRoute(
+                        start: _userLocation!,
+                        destination: _routeDestinationPoi!.location,
+                        trafficEnabled: nextState,
+                      ).then((updatedResult) {
+                        if (mounted && _isRouteActive) {
+                          setState(() {
+                            _currentRouteResult = updatedResult;
+                          });
+                        }
+                      });
+                    }
+
+                    _showFloatingBanner(
+                      text: nextState
+                          ? 'Capa de tráfico vial en tiempo real activada'
+                          : 'Capa de tráfico vial desactivada',
+                      icon: Icons.traffic_rounded,
+                      color: nextState ? AppColors.goldenOrange : AppColors.textMuted,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _showTrafficLayer ? AppColors.goldenOrange : AppColors.surfaceBorder,
+                        width: 1.5,
                       ),
-                label: const Text(
-                  'CAPTURAR POSICIÓN',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
+                      boxShadow: [
+                        BoxShadow(
+                          color: _showTrafficLayer
+                              ? AppColors.goldenOrange.withValues(alpha: 0.25)
+                              : Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.traffic_rounded,
+                          color: _showTrafficLayer ? AppColors.goldenOrange : AppColors.textMuted,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'TRÁFICO',
+                          style: TextStyle(
+                            color: _showTrafficLayer ? AppColors.goldenOrange : AppColors.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+          ),
+
+          // 5. Notificación / Banner Flotante Superior (z-index más alto sobre todos los elementos con botón '✕')
+          if (_floatingBannerText != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: isTabletOrLarger ? 40 : 16,
+              right: isTabletOrLarger ? 40 : 16,
+              child: Material(
+                color: Colors.transparent,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, val, child) {
+                    return Transform.translate(
+                      offset: Offset(0, (1 - val) * -16),
+                      child: Opacity(
+                        opacity: val,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated.withValues(alpha: 0.98),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _floatingBannerColor ?? AppColors.cyan,
+                        width: 1.4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_floatingBannerColor ?? AppColors.cyan).withValues(alpha: 0.3),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _floatingBannerIcon ?? Icons.info_outline_rounded,
+                          color: _floatingBannerColor ?? AppColors.cyan,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _floatingBannerText!,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _dismissFloatingBanner,
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceBorder.withValues(alpha: 0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Panel HUD Superior Persistente de Ruta Activa con Telemetría de Tráfico en Tiempo Real
+  Widget _buildTopActiveRoutePanel(Color accentColor, bool isTabletOrLarger) {
+    final route = _currentRouteResult!;
+    final destination = _routeDestinationPoi!;
+    final trafficColor = route.trafficColor;
+    final trafficLabel = route.trafficLevelLabel.toUpperCase();
+    final delayMin = route.trafficDelayMinutes;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: isTabletOrLarger ? 16 : 12,
+        vertical: isTabletOrLarger ? 12 : 9,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: trafficColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: trafficColor.withValues(alpha: 0.25),
+            blurRadius: 16,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Icono de Ruta con Glow Táctico
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: trafficColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: trafficColor.withValues(alpha: 0.5), width: 1),
+            ),
+            child: Icon(Icons.navigation_rounded, color: trafficColor, size: isTabletOrLarger ? 20 : 18),
+          ),
+          const SizedBox(width: 10),
+          // Detalles de la ruta activa y telemetría de tráfico
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        destination.name.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: isTabletOrLarger ? 13 : 11.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Badge de Flujo Vehicular
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: trafficColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: trafficColor.withValues(alpha: 0.6), width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5.5,
+                            height: 5.5,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: trafficColor,
+                            ),
+                          ),
+                          const SizedBox(width: 3.5),
+                          Text(
+                            trafficLabel,
+                            style: TextStyle(
+                              color: trafficColor,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    Text(
+                      '${route.formattedDistance} • ETA: ${route.formattedTrafficDuration}',
+                      style: TextStyle(
+                        color: trafficColor,
+                        fontSize: isTabletOrLarger ? 11.5 : 10.5,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    if (delayMin > 0)
+                      Text(
+                        '(+$delayMin min demora)',
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Botón Claro '✕' para Cancelar / Cerrar Ruta Activa
+          GestureDetector(
+            onTap: _cancelRoute,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.surfaceBorder, width: 1),
+              ),
+              child: const Icon(
+                Icons.close_rounded,
+                color: AppColors.textMuted,
+                size: 16,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1887,14 +2094,14 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
             tooltip: 'Filtros Territoriales (14 Deptos / Precios)',
             onPressed: _openAdvancedSearch,
           ),
-          // Botón Alternar Niebla
+          // Botón Alternar Niebla / Guía
           IconButton(
             icon: Icon(
               _isFogActive ? Icons.cloud_outlined : Icons.cloud_off_outlined,
               color: _isFogActive ? AppColors.cyan : AppColors.textSecondary,
               size: 20,
             ),
-            tooltip: 'Alternar Niebla',
+            tooltip: 'Guía Cartográfica',
             onPressed: () {
               setState(() => _isFogActive = !_isFogActive);
             },
@@ -2039,7 +2246,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'DIF: ${poi.difficulty}',
+                          'ACCESO: ${poi.difficulty}',
                           style: const TextStyle(
                             color: AppColors.textMuted,
                             fontSize: 9.5,
@@ -2078,8 +2285,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
       final dept = _filterCriteria.selectedDepartment;
       final zone = _filterCriteria.selectedZone;
       final price = _filterCriteria.selectedPriceRange;
-      final difficulty = _filterCriteria.selectedDifficulty;
-      final label = dept ?? zone ?? price ?? difficulty ?? 'FILTRADO';
+      final label = dept ?? zone ?? price ?? 'FILTRADO';
 
       return Container(
         margin: const EdgeInsets.only(top: 8),
@@ -2102,7 +2308,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'FILTRO: ${label.toUpperCase()} (${_activeDisplayedPois.length} ATALAYAS)',
+                'FILTRO: ${label.toUpperCase()} (${_activeDisplayedPois.length} DESTINOS)',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -2168,14 +2374,14 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
           Flexible(
             child: Text(
               _isLocatingUser
-                  ? 'LOCALIZANDO OPERADOR (GPS)...'
+                  ? 'LOCALIZANDO POSICIÓN (GPS)...'
                   : (!widget.gpsEnabled
                       ? 'GPS INACTIVO // CONFIGURAR EN AJUSTES'
                       : (_userProfile != null
-                          ? '[${_userProfile!.role.toUpperCase()}] ${_userProfile!.fullName ?? _userProfile!.username ?? "AGENTE"} // GPS ACTIVO'
+                          ? 'Sesión: ${_userProfile!.fullName ?? _userProfile!.username ?? "Usuario"} (${_userProfile!.isAdmin ? "Administrador" : "Usuario"})'
                           : (_userLocation != null
-                              ? 'GPS ACTIVO // TAP MAPA = PIN'
-                              : 'ENLACE TÁCTICO // EL SALVADOR'))),
+                              ? 'GPS ACTIVO // TAP MAPA = MARCADOR'
+                              : 'TURISMO Y CARTOGRAFÍA // EL SALVADOR'))),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -2218,7 +2424,7 @@ class MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixi
           SizedBox(width: 8),
           Flexible(
             child: Text(
-              'NO HAY REGISTROS EN BASE DE DATOS',
+              'NO HAY DESTINOS REGISTRADOS',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

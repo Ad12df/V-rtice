@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Breakpoints estandar para el diseno adaptativo de GeoTurismo.
+/// Breakpoints estandar para el diseno adaptativo de Next Trip.
 class ResponsiveBreakpoints {
   static const double mobileMax = 600.0;
   static const double tabletMax = 1024.0;

@@ -118,7 +118,7 @@ class _EventsScreenState extends State<EventsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'GEOTURISMO // EVENTOS',
+                  'NEXT TRIP // EVENTOS',
                   style: TextStyle(
                     color: AppColors.turquoise,
                     fontSize: 13,
@@ -268,7 +268,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         Icon(Icons.cloud_off_rounded, color: AppColors.goldenOrange, size: 48),
                         SizedBox(height: 14),
                         Text(
-                          'NO HAY REGISTROS EN BASE DE DATOS',
+                          'NO HAY EVENTOS PROGRAMADOS',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: AppColors.textPrimary,
@@ -279,7 +279,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          'La base de datos de Supabase no contiene eventos registrados.',
+                          'No hay eventos programados en este momento. ¡Sé el primero en publicar uno!',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                         ),
@@ -557,7 +557,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   ],
                   Flexible(
                     child: Text(
-                      'Organizado por: ${event.organizerName != null && event.organizerName!.isNotEmpty ? event.organizerName : 'Agente'}',
+                      'Organizado por: ${event.organizerName != null && event.organizerName!.isNotEmpty ? event.organizerName : 'Usuario'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -656,9 +656,9 @@ class _EventsScreenState extends State<EventsScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                icon: const Icon(Icons.gps_fixed_rounded, size: 16),
+                icon: const Icon(Icons.place_rounded, size: 16),
                 label: const Text(
-                  'UBICACIÓN EN MAPA TÁCTICO',
+                  'VER EN EL MAPA',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w900,

@@ -1,140 +1,116 @@
-# 🧭 GeoTurismo — Aplicación Móvil Flutter
+# 🧭 Next Trip (v1.5.0 beta) — Aplicación Móvil Flutter
 
-Aplicación multiplataforma de turismo táctico y cartografía para El Salvador, construida con **Flutter 3.x** y **Dart 3.x**. Integra renderizado interactivo de mapas sobre teselas libres de OpenStreetMap / ArcGIS, cálculo de rutas viales en tiempo real mediante **OSRM**, sincronización reactiva directa con **Supabase** y un modelo de acceso gobernado por roles (**RBAC**).
+> **Next Trip Client v1.5.0 beta (Build 1.5.0+1)**  
+> Desarrollado por **The Green Team**  
+> Fecha de edición: **Septiembre 2026**  
+> Ámbito Territorial: República de El Salvador (14 Departamentos)
+
+Aplicación móvil multiplataforma de turismo descentralizado, cartografía interactiva y movilidad vial para El Salvador, construida con **Flutter 3.x** y **Dart 3.x** (`version: 1.5.0+1`). Integra renderizado de mapas sobre teselas libres de OpenStreetMap / ArcGIS, cálculo de rutas viales en tiempo real con consideración de tráfico, capa conmutable de flujo vehicular, sincronización reactiva con **Supabase** y un modelo de acceso basado en roles (**RBAC**).
 
 ---
 
 ## 🎨 Identidad Visual & UI/UX
 
-La interfaz de GeoTurismo combina el rigor técnico de los paneles de telemetría y cartografía táctica con la paleta orgánica y turística de El Salvador:
+La interfaz de Next Trip ofrece una experiencia de navegación moderna, inmersiva y formal:
 
 - **Tokens de Color Oficiales (`AppColors`):**
-  - `Azul Ubicación` (`#2A73B5`): Indicador del operador, radar y pines interactivos.
-  - `Verde Turquesa` (`#218B8D`): Bordes, isotipo, anillos de escáner y badges tácticos.
-  - `Naranja Dorado` (`#F39C12`): **Trazo de rutas viales (`PolylineLayer`)**, balizas de eventos y alertas.
-  - `Verde Volcán` (`#1E5A5A`): Atalayas naturales, cordilleras y chips de dificultad.
+  - `Azul Ubicación` (`#2A73B5`): Indicador de posición del usuario y enlaces interactivos.
+  - `Verde Turquesa` (`#218B8D`): Bordes de acento, isotipo circular oficial e indicadores de estado.
+  - `Naranja Dorado` (`#F39C12`): **Trazado de rutas viales (`PolylineLayer`)**, botón de tráfico activo y destacados.
+  - `Verde Volcán` (`#1E5A5A`): Destinos naturales, parques nacionales y chips informativos.
   - `Azul Marino` (`#1B365D`): Contornos de polilíneas, textos principales en modo claro y sombras.
   - `Fondo Neutro` (`#F8F9FA`): Superficies en modo claro.
-  - `Fondo Oscuro Táctico` (`#0D1B2A`): Entorno inmersivo nocturno de cartografía.
+  - `Fondo Oscuro` (`#0D1B2A`): Entorno inmersivo para cartografía nocturna y alto contraste.
 - **Tipografía y Estilo:**
-  - Estilo monoespaciado limpio (`fontFamily: monospace`) para telemetría, coordenadas GPS y cabeceras de sistema.
-  - Títulos con espaciado expandido (`letterSpacing: 4-6`) y badges en mayúsculas estilo consola de mando.
+  - Tipografía clara con soporte monoespaciado para telemetría vial, distancias métricas y coordenadas GPS.
+  - Diseño responsivo adaptado tanto a pantallas móviles (<600dp) como tabletas (>=600dp).
+- **Emblema Oficial:**
+  - Logotipo circular transparente en `frontend/assets/images/logo.png` con antialiasing para todas las densidades de pantalla.
 
 ---
 
 ## 📂 Arquitectura Modular por Features (`lib/`)
 
-La aplicación sigue los principios de **Clean Architecture Táctica** dividida por dominios funcionales (*feature-first*):
+La aplicación sigue una arquitectura limpia estructurada por dominios (*feature-first*):
 
 ```text
 frontend/lib/
-├── main.dart                       # Inicialización de Supabase, AuthGate y temas globales
-├── core/                           # Capa transversal y utilidades compartidas
+├── main.dart                       # Inicialización, AuthGate, MaterialApp reactivo y temas
+├── core/                           # Núcleo transversal y utilidades compartidas
 │   ├── constants/
-│   │   ├── app_colors.dart         # Paleta de colores oficial de GeoTurismo
+│   │   ├── app_colors.dart         # Paleta de colores oficial de Next Trip
 │   │   └── environment.dart        # Configuración de URLs y credenciales públicas
 │   ├── localization/
-│   │   └── app_localizations.dart  # Diccionarios completos de traducción (Español / Inglés)
+│   │   └── app_localizations.dart  # Diccionarios de traducción i18n (Español / Inglés)
 │   ├── providers/
-│   │   └── settings_provider.dart  # Singleton ChangeNotifier para tema, escala y lenguaje
+│   │   └── settings_provider.dart  # Estado persistente (SharedPreferences + Supabase sync)
 │   ├── theme/
-│   │   └── app_theme.dart          # Temas Oscuro Táctico y Claro estructurados
+│   │   └── app_theme.dart          # Temas Oscuro y Claro estructurados
 │   └── utils/
-│       └── responsive.dart         # Breakpoints adaptativos (Móvil <600dp, Tablet >=600dp)
+│       └── responsive.dart         # Breakpoints adaptativos (Móvil / Tablet)
 └── features/                       # Módulos organizados por dominio
-    ├── auth/                       # Autenticación y Registro con RBAC
+    ├── auth/                       # Autenticación, registro con indicador de seguridad y perfiles
+    ├── map/                        # Cartografía, tráfico vehicular, rutas y gestión de destinos
     │   ├── presentation/
-    │   │   ├── screens/auth_screen.dart # Formulario con indicador de entropía y fecha
-    │   │   └── widgets/            # CustomTextField, CustomButton, TacticalAlert
-    │   └── services/auth_service.dart   # Sincronización con GoTrue y gestión de perfiles
-    ├── map/                        # Cartografía y Trazado de Rutas
-    │   ├── presentation/
-    │   │   ├── screens/map_screen.dart  # Visor OpenStreetMap, PolylineLayer y radar
+    │   │   ├── screens/map_screen.dart   # Visor cartográfico, capa de tráfico y panel HUD
     │   │   └── widgets/
-    │   │       ├── add_location_modal.dart   # Modal de captura GPS para administradores
-    │   │       └── advanced_search_modal.dart# Filtro por 14 departamentos y zonas
+    │   │       ├── add_location_modal.dart    # Formulario asistido para nuevos destinos
+    │   │       └── advanced_search_modal.dart # Filtros por 14 departamentos y precios
     │   └── services/
-    │       ├── location_service.dart    # PostGIS RPC y enrutamiento con OSRM
-    │       └── map_cache_service.dart   # Caché persistente de teselas en SQLite
-    ├── events/                     # Agenda Táctica de Eventos
-    │   ├── models/tactical_event.dart   # Modelo de datos con serialización Supabase
+    │       ├── location_service.dart     # Enrutamiento con tráfico y consultas a Supabase
+    │       ├── map_cache_service.dart    # Caché offline de teselas en SQLite
+    │       └── traffic_network_service.dart # Red de tráfico vial en tiempo real
+    ├── events/                     # Cartelera de eventos turísticos y culturales
     │   ├── presentation/
-    │   │   ├── screens/events_screen.dart# Lista reactiva y buscador en tiempo real
-    │   │   └── widgets/add_event_modal.dart # Creación de eventos con organizer_id
-    │   └── services/events_service.dart # Sincronización con RPC get_all_events
-    ├── settings/                   # Ajustes y Consola Administrativa
+    │   │   ├── screens/events_screen.dart # Lista reactiva y buscador de actividades
+    │   │   └── widgets/add_event_modal.dart  # Creación de eventos con organizer_id
+    │   └── services/events_service.dart  # Sincronización con RPC get_all_events
+    ├── settings/                   # Ajustes y panel de administración
     │   └── presentation/screens/
-    │       ├── settings_screen.dart     # Perfil, cambio de password, avatar y GPS switch
-    │       └── admin_panel_screen.dart  # Panel de Mando (Operadores, Eventos, Atalayas)
-    ├── shell/                      # Contenedor de Navegación
-    │   └── presentation/screens/app_shell.dart # Barra inferior y botón radar flotante
-    └── splash/                     # Pantalla de Arranque
-        └── presentation/screens/splash_screen.dart # Escáner radar, isotipo y ping de salud
+    │       ├── settings_screen.dart      # Selector de idioma, modo visual y perfil
+    │       └── admin_panel_screen.dart   # Panel de control de usuarios y destinos
+    ├── shell/                      # Contenedor de navegación (AppShell)
+    └── splash/                     # Pantalla de arranque con isotipo oficial
 ```
 
 ---
 
-## 🖥️ Componentes Clave de la Interfaz (UI)
+## 🖥️ Nuevas Capacidades en la UI/UX (v1.5.0 beta)
 
-### 1. `MapScreen` (`features/map/presentation/screens/map_screen.dart`)
-- **Capas Cartográficas:** Renderizado de teselas mediante `flutter_map` (ArcGIS Dark Gray Canvas con fallback a OpenStreetMap estándar).
-- **Rutas Viales Tácticas (`PolylineLayer`):** Traza el camino vial óptimo en color **Naranja Dorado (`#F39C12`)** con contorno **Azul Marino (`#1B365D`)** calculado por OSRM.
-- **Captura GPS para Administradores:** Si el usuario tiene rol `admin`, se despliega un botón flotante (`admin_capture_current_position_fab`) y se habilita la pulsación sobre el mapa para registrar una atalaya con coordenadas exactas en tiempo real.
-- **Lanzador de Navegación Externa:** Botón de un toque para abrir la ruta en **Google Maps** o **Waze** a través de `url_launcher`.
-- **Buscador y Filtro Territorial:** Modal avanzado con los 14 departamentos y 4 zonas de El Salvador, filtrando por costo y dificultad.
+### 1. `MapScreen`: Capa de Tráfico Vial y Enrutamiento Nativo
+- **Capa Conmutable de Tráfico:** Botón lateral flotante (**TRÁFICO**) que alterna al instante la visibilidad de la red de tráfico vehicular sobre las calles de El Salvador (verde: fluido, ámbar: moderado, rojo: congestión).
+- **Enrutamiento Dinámico con Factor de Tráfico:** Cálculo de tiempo estimado (ETA) realista considerando la congestión y horas pico.
+- **Panel HUD Superior Flotante:** Despliega distancia formateada (ej. `18.4 km`), duración estimada y botón directo `✕` para cancelar la trayectoria activa.
+- **Navegación 100% Nativa:** Sin redirecciones forzadas a aplicaciones de terceros.
 
-### 2. `EventsScreen` (`features/events/presentation/screens/events_screen.dart`)
-- **Lista Reactiva:** Conectada a `EventsService.eventsNotifier`, actualizándose instantáneamente ante inserciones o modificaciones.
-- **Filtrado Dinámico:** Búsqueda en tiempo real por título, descripción, ubicación o departamento, y filtrado por estado (`upcoming`, `live`, `completed`).
-- **Modal de Creación `AddEventModal`:** Disponible para usuarios autenticados; auto-asigna el `auth.uid()` como `organizer_id` para garantizar la autoría del evento.
+### 2. Modo Administrador: Conversión de Marcadores a Destinos Turísticos
+- **Detección Automática de Rol:** Al tocar cualquier punto provisional en el mapa, los usuarios con rol `admin` disponen del botón destacado: **`AGREGAR COMO DESTINO TURÍSTICO`**.
+- **Formulario Asistido (`AddLocationModal`):** Precarga de forma automática las coordenadas geográficas exactas del punto seleccionado (latitud y longitud).
+- **Campos del Registro:** Nombre del destino, descripción informativa, departamento (14 departamentos de El Salvador), zona geográfica, categoría turística, tarifa de ingreso ($ USD) y URLs de imágenes.
 
-### 3. `AuthScreen` y `SplashScreen`
-- **Isotipo Oficial y Anillo de Escáner:** Incorporan el emblema de GeoTurismo con un radar animado de escaneo, resplandor turquesa pulsante y micro-animaciones continuas.
-- **Tipografía ASCII Limpia:** Indicadores de estado del sistema (`SYS-BOOT // V1.0`, `EL SALVADOR`), telemetría paso a paso y diseño de consola de comando.
-- **Seguridad en Entrada:** Formulario con medidor de entropía de contraseñas (`PasswordStrengthIndicator`), selector de fecha de nacimiento y protección contra contraseñas débiles.
+### 3. Módulo de Ajustes (`SettingsScreen`): Selector Bilingüe y Offline-First
+- **Selector de Idioma:** Opciones intuitivas para alternar entre **Español (es)** e **English (en)**.
+- **Actualización en Caliente:** El cambio de idioma se refleja de inmediato en toda la aplicación mediante `AppLocalizations` sin requerir reinicio.
+- **Estrategia Offline-First:** Las preferencias se cargan instantáneamente desde `SharedPreferences` al abrir la app. Si existe conexión y sesión activa, se sincronizan de forma bidireccional con la tabla `public.user_settings` en Supabase.
 
-### 4. `AdminPanelScreen` (`features/settings/presentation/screens/admin_panel_screen.dart`)
-- **Consola de Mando para Administradores:**
-  1. *OPERADORES:* Nómina completa de usuarios con control de suspensión/desuspensión inmediata (`is_banned`).
-  2. *EVENTOS:* Modificación y eliminación de la agenda de eventos.
-  3. *ATALAYAS:* Control CRUD de destinos y atalayas turísticas.
-  4. *ESTADÍSTICAS:* Métricas cuantitativas del sistema y desglose territorial por departamento.
+### 4. Purga Integral de Terminología Gamificada
+- Se eliminó cualquier etiqueta o concepto de "Dificultad" en modales, filtros y fichas de destino.
+- Sustitución de jerga por términos profesionales de cartografía y turismo formal.
 
 ---
 
-## 🔄 Flujo de Servicios y Sincronización con Supabase
+## 🔄 Servicios y Persistencia
 
-```
-  ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-  │   AuthService   │       │ LocationService │       │  EventsService  │
-  └────────┬────────┘       └────────┬────────┘       └────────┬────────┘
-           │                         │                         │
-           │ GoTrue                  │ RPC get_all_locations   │ RPC get_all_events
-           │ JWT / Storage           │ OSRM Driving Engine     │ CRUD en 'events'
-           ▼                         ▼                         ▼
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │                      SUPABASE BACKEND-AS-A-SERVICE                  │
-  │                                                                     │
-  │   • Autenticación: auth.users -> Triggers -> public.profiles        │
-  │   • Políticas RLS: Validación en cada INSERT, UPDATE y DELETE       │
-  │   • Storage: Subida de avatares a bucket 'avatars'                  │
-  │   • Cálculos Espaciales: Funciones PL/pgSQL PostGIS en servidor     │
-  └─────────────────────────────────────────────────────────────────────┘
-```
+### 1. `SettingsProvider`
+- Gestiona el estado reactivo del tema visual, tamaño de fuente, idioma, capa de tráfico y notificaciones.
+- Almacena las preferencias localmente en `SharedPreferences` y ejecuta upserts asíncronos en `public.user_settings`.
 
-### 1. Enrutamiento Vial con OSRM
-En `LocationService.calculateTacticalRoute`:
-- Realiza una petición HTTP a `https://router.project-osrm.org/route/v1/driving/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson`.
-- Decodifica la geometría GeoJSON en una lista de puntos `LatLng` para alimentar el `PolylineLayer`.
-- Si el servicio externo no responde en 4 segundos, conmuta automáticamente a un cálculo geodésico Haversine en línea recta como mecanismo de resiliencia.
+### 2. `LocationService` & `TrafficNetworkService`
+- Administra el catálogo de destinos turísticos en Supabase.
+- Calcula rutas con OSRM y aplica el modelo de congestión vehicular adaptado a la red vial salvadoreña.
 
-### 2. Caché de Teselas Offline (`MapCacheService`)
-- Almacena en una base de datos local SQLite (`dio_cache_interceptor_db_store`) las teselas cartográficas de todo El Salvador para los niveles de zoom del 8 al 11.
-- Permite la visualización continua de la cartografía básica incluso sin conectividad a internet en áreas remotas o senderos de montaña.
-
-### 3. Almacenamiento Multimedia (Storage)
-- Al actualizar el avatar en `SettingsScreen`, la imagen se comprime en formato JPEG y se sube directamente al bucket `avatars` en la ruta `{user_id}/avatar_{timestamp}.jpg`.
-- La URL pública generada se almacena en la columna `avatar_url` de `public.profiles`.
+### 3. `MapCacheService`
+- Almacena teselas de OpenStreetMap en una base de datos local SQLite para permitir la exploración en áreas rurales o zonas sin cobertura celular.
 
 ---
 
@@ -142,7 +118,7 @@ En `LocationService.calculateTacticalRoute`:
 
 ### 1. Requisitos Previos
 - Flutter SDK `>= 3.24.0` (Dart `>= 3.5.0`).
-- Android Studio / Android SDK configurado con Java 17 o 21.
+- Android Studio / Android SDK configurado con JDK 17 o 21.
 
 ### 2. Configurar Variables de Entorno
 Verifica los valores en [`lib/core/constants/environment.dart`](file:///frontend/lib/core/constants/environment.dart):
@@ -161,17 +137,20 @@ cd frontend
 # Descargar dependencias
 flutter pub get
 
-# Ejecutar análisis estático de código (debe reportar 0 issues)
+# Ejecutar análisis estático (0 issues)
 flutter analyze
 
-# Iniciar aplicación en emulador o dispositivo conectado
+# Ejecutar batería de pruebas unitarias
+flutter test
+
+# Iniciar aplicación en modo desarrollo
 flutter run
 ```
 
-### 4. Compilación del APK para Producción (Android)
-Para generar el archivo binario optimizado para distribución en dispositivos Android:
+### 4. Compilación del APK para Producción (Release)
+Para generar el paquete binario de instalación de la versión `1.5.0+1`:
 ```bash
 flutter build apk --release
 ```
-El archivo resultante se generará en:
+El archivo generado se ubicará en:  
 `build/app/outputs/flutter-apk/app-release.apk`

@@ -51,7 +51,7 @@ class VerticeApp extends StatelessWidget {
       builder: (context, _) {
         final settings = SettingsProvider.instance;
         return MaterialApp(
-          title: 'GeoTurismo',
+          title: 'Next Trip',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
@@ -69,7 +69,7 @@ class VerticeApp extends StatelessWidget {
             final mediaQueryData = MediaQuery.of(context);
             return MediaQuery(
               data: mediaQueryData.copyWith(
-                textScaler: TextScaler.linear(settings.textScaleFactor),
+                textScaler: TextScaler.linear(settings.fontScale),
               ),
               child: child ?? const SizedBox.shrink(),
             );

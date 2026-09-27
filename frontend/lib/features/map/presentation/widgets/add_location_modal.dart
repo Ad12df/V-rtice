@@ -5,24 +5,30 @@ import 'package:vertice/core/constants/app_colors.dart';
 import 'package:vertice/features/auth/presentation/widgets/tactical_alert_dialog.dart';
 import 'package:vertice/features/map/services/location_service.dart';
 
-/// Modal administrativo para la captura y registro de nuevas Atalayas y Puntos Turísticos en El Salvador.
+/// Modal administrativo para la captura y registro de nuevos Destinos y Puntos Turísticos en El Salvador.
 /// EXCLUSIVO PARA ADMINISTRADORES (RBAC: profile.role == 'admin').
 class AddLocationModal extends StatefulWidget {
   final LatLng initialCoordinates;
+  final String? initialName;
 
   const AddLocationModal({
     super.key,
     required this.initialCoordinates,
+    this.initialName,
   });
 
   static Future<TacticalPoi?> show(
     BuildContext context, {
     required LatLng initialCoordinates,
+    String? initialName,
   }) {
     return showDialog<TacticalPoi>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AddLocationModal(initialCoordinates: initialCoordinates),
+      builder: (ctx) => AddLocationModal(
+        initialCoordinates: initialCoordinates,
+        initialName: initialName,
+      ),
     );
   }
 
@@ -39,6 +45,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
   late final TextEditingController _latController;
   late final TextEditingController _lngController;
   late final TextEditingController _feeController;
+  late final TextEditingController _imageUrlController;
 
   bool _isSaving = false;
   bool _isLocatingGps = false;
@@ -71,14 +78,15 @@ class _AddLocationModalState extends State<AddLocationModal> {
   ];
 
   static const List<String> categories = [
-    'ATALAYA NATURAL',
+    'PARQUE NACIONAL / VOLCÁN',
     'ZONA ARQUEOLÓGICA',
-    'NÚCLEO URBANO',
-    'SECTOR COSTERO',
-    'RESERVA DE SELVA',
-    'CRÁTER ACUÁTICO',
-    'PATRIMONIO HISTÓRICO',
-    'MIRADOR TÁCTICO',
+    'CENTRO HISTÓRICO / CULTURAL',
+    'SECTOR COSTERO / PLAYA',
+    'LAGO / CUERPO DE AGUA',
+    'RESERVA NATURAL / BOSQUE',
+    'MIRADOR PANORÁMICO',
+    'TURISMO DE MONTAÑA',
+    'DESTINO GASTRONÓMICO',
   ];
 
   static const List<String> priceCategories = [
@@ -88,23 +96,15 @@ class _AddLocationModalState extends State<AddLocationModal> {
     'EXCLUSIVO',
   ];
 
-  static const List<String> difficulties = [
-    'BAJA',
-    'MEDIA',
-    'ALTA',
-    'ÉPICA',
-  ];
-
   late String _selectedDept;
   late String _selectedZone;
   late String _selectedCategory;
   late String _selectedPriceCategory;
-  late String _selectedDifficulty;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
+    _nameController = TextEditingController(text: widget.initialName ?? '');
     _descController = TextEditingController();
     _latController = TextEditingController(
       text: widget.initialCoordinates.latitude.toStringAsFixed(6),
@@ -113,12 +113,12 @@ class _AddLocationModalState extends State<AddLocationModal> {
       text: widget.initialCoordinates.longitude.toStringAsFixed(6),
     );
     _feeController = TextEditingController(text: '0.00');
+    _imageUrlController = TextEditingController();
 
     _selectedCategory = categories.first;
     _selectedDept = 'San Salvador';
     _selectedZone = 'Zona Central';
     _selectedPriceCategory = 'GRATUITO';
-    _selectedDifficulty = 'MEDIA';
   }
 
   @override
@@ -128,6 +128,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
     _latController.dispose();
     _lngController.dispose();
     _feeController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -173,12 +174,16 @@ class _AddLocationModalState extends State<AddLocationModal> {
     final entryFee = double.tryParse(_feeController.text.trim()) ?? 0.00;
     final name = _nameController.text.trim();
     final description = _descController.text.trim().isEmpty
-        ? 'Punto táctico de interés turístico en El Salvador.'
+        ? 'Punto de interés turístico en El Salvador.'
         : _descController.text.trim();
 
     final priceRange = entryFee <= 0.0 || _selectedPriceCategory == 'GRATUITO'
         ? 'Gratis'
         : '\$${entryFee.toStringAsFixed(2)} USD';
+
+    final imageUrl = _imageUrlController.text.trim().isNotEmpty
+        ? _imageUrlController.text.trim()
+        : null;
 
     setState(() => _isSaving = true);
 
@@ -188,13 +193,14 @@ class _AddLocationModalState extends State<AddLocationModal> {
       category: _selectedCategory,
       location: LatLng(lat, lng),
       description: description,
-      difficulty: _selectedDifficulty,
+      difficulty: 'MEDIA',
       icon: _getIconForCategory(_selectedCategory),
       department: _selectedDept,
       zone: _selectedZone,
       priceCategory: _selectedPriceCategory,
       entryFee: entryFee,
       priceRange: priceRange,
+      imageUrl: imageUrl,
     );
 
     try {
@@ -206,8 +212,8 @@ class _AddLocationModalState extends State<AddLocationModal> {
 
       TacticalAlert.show(
         context,
-        title: 'ATALAYA REGISTRADA // ADMIN',
-        message: 'La atalaya "$name" ha sido persistida en Supabase y renderizada en el mapa.',
+        title: 'DESTINO REGISTRADO',
+        message: 'El destino turístico "$name" ha sido guardado exitosamente y añadido al mapa.',
         type: AlertType.success,
       );
     } catch (e) {
@@ -216,33 +222,30 @@ class _AddLocationModalState extends State<AddLocationModal> {
       TacticalAlert.show(
         context,
         title: 'ERROR DE REGISTRO',
-        message: 'No fue posible registrar la atalaya: $e',
+        message: 'No fue posible registrar el destino turístico: $e',
         type: AlertType.error,
       );
     }
   }
 
   IconData _getIconForCategory(String category) {
-    switch (category) {
-      case 'ATALAYA NATURAL':
-        return Icons.terrain_rounded;
-      case 'ZONA ARQUEOLÓGICA':
-        return Icons.account_balance_rounded;
-      case 'NÚCLEO URBANO':
-        return Icons.location_city_rounded;
-      case 'SECTOR COSTERO':
-        return Icons.waves_rounded;
-      case 'RESERVA DE SELVA':
-        return Icons.forest_rounded;
-      case 'CRÁTER ACUÁTICO':
-        return Icons.water_rounded;
-      case 'PATRIMONIO HISTÓRICO':
-        return Icons.museum_rounded;
-      case 'MIRADOR TÁCTICO':
-        return Icons.explore_rounded;
-      default:
-        return Icons.place_rounded;
+    final cat = category.toUpperCase();
+    if (cat.contains('VOLCÁN') || cat.contains('MONTAÑA') || cat.contains('PARQUE')) {
+      return Icons.terrain_rounded;
+    } else if (cat.contains('ARQUEOLÓGICA') || cat.contains('HISTÓRICO')) {
+      return Icons.account_balance_rounded;
+    } else if (cat.contains('PLAYA') || cat.contains('COSTERO') || cat.contains('SURF')) {
+      return Icons.waves_rounded;
+    } else if (cat.contains('RESERVA') || cat.contains('BOSQUE')) {
+      return Icons.forest_rounded;
+    } else if (cat.contains('LAGO') || cat.contains('AGUA')) {
+      return Icons.water_rounded;
+    } else if (cat.contains('MIRADOR')) {
+      return Icons.visibility_rounded;
+    } else if (cat.contains('GASTRONÓMICO')) {
+      return Icons.restaurant_rounded;
     }
+    return Icons.place_rounded;
   }
 
   @override
@@ -278,7 +281,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'REGISTRAR NUEVA ATALAYA',
+                  'REGISTRAR NUEVO DESTINO',
                   style: TextStyle(
                     color: AppColors.textPrimary,
                     fontSize: 14,
@@ -287,7 +290,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
                   ),
                 ),
                 Text(
-                  'OPERACIÓN EXCLUSIVA DE ADMINISTRADOR // SV',
+                  'PANEL ADMINISTRATIVO // EL SALVADOR',
                   style: TextStyle(
                     color: AppColors.turquoise,
                     fontSize: 9.5,
@@ -312,14 +315,14 @@ class _AddLocationModalState extends State<AddLocationModal> {
               children: [
                 const SizedBox(height: 6),
 
-                // ─── NOMBRE DE LA ATALAYA ──────────────────────────────
-                _buildFieldLabel('Nombre del Lugar / Atalaya *'),
+                // ─── NOMBRE DEL DESTINO ────────────────────────────────
+                _buildFieldLabel('Nombre del Destino Turístico *'),
                 TextFormField(
                   controller: _nameController,
                   style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   decoration: _buildInputDecoration(
                     hint: 'Ej. Mirador Espíritu de la Montaña',
-                    icon: Icons.castle_rounded,
+                    icon: Icons.place_rounded,
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
@@ -330,39 +333,12 @@ class _AddLocationModalState extends State<AddLocationModal> {
                 ),
                 const SizedBox(height: 12),
 
-                // ─── CATEGORÍA Y DIFICULTAD ────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFieldLabel('Categoría'),
-                          _buildDropdown<String>(
-                            value: _selectedCategory,
-                            items: categories,
-                            onChanged: (v) => setState(() => _selectedCategory = v!),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFieldLabel('Dificultad'),
-                          _buildDropdown<String>(
-                            value: _selectedDifficulty,
-                            items: difficulties,
-                            onChanged: (v) => setState(() => _selectedDifficulty = v!),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                // ─── CATEGORÍA TURÍSTICA ──────────────────────────────
+                _buildFieldLabel('Categoría Turística *'),
+                _buildDropdown<String>(
+                  value: _selectedCategory,
+                  items: categories,
+                  onChanged: (v) => setState(() => _selectedCategory = v!),
                 ),
                 const SizedBox(height: 12),
 
@@ -519,7 +495,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
                 const SizedBox(height: 12),
 
                 // ─── DESCRIPCIÓN ──────────────────────────────────────
-                _buildFieldLabel('Descripción Táctica del Sitio'),
+                _buildFieldLabel('Información y Recomendaciones del Lugar'),
                 TextFormField(
                   controller: _descController,
                   maxLines: 2,
@@ -527,6 +503,19 @@ class _AddLocationModalState extends State<AddLocationModal> {
                   decoration: _buildInputDecoration(
                     hint: 'Vistas panorámicas, senderos, datos clave de acceso...',
                     icon: Icons.description_rounded,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ─── FOTOGRAFÍA / IMAGEN DEL DESTINO ──────────────────
+                _buildFieldLabel('Fotografía o Imagen del Destino (URL)'),
+                TextFormField(
+                  controller: _imageUrlController,
+                  keyboardType: TextInputType.url,
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  decoration: _buildInputDecoration(
+                    hint: 'https://ejemplo.com/foto-destino.jpg',
+                    icon: Icons.add_photo_alternate_rounded,
                   ),
                 ),
               ],
@@ -564,7 +553,7 @@ class _AddLocationModalState extends State<AddLocationModal> {
                   ),
                 )
               : const Text(
-                  'REGISTRAR ATALAYA',
+                  'REGISTRAR DESTINO',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.1,

@@ -1,5 +1,5 @@
 -- ====================================================================
--- PROYECTO: GEOTURISMO (Plataforma de Turismo Táctico en El Salvador)
+-- PROYECTO: NEXT TRIP (v1.4.0 beta - Plataforma de Turismo Táctico en El Salvador)
 -- ESQUEMA DE BASE DE DATOS SUPABASE / POSTGRESQL + POSTGIS (RBAC)
 -- ====================================================================
 
@@ -77,7 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_is_banned ON public.profiles(is_banned);
 
 -- --------------------------------------------------------------------
--- 3. TABLA: LOCATIONS (Atalayas y Puntos Turísticos en El Salvador)
+-- 3. TABLA: LOCATIONS (Destinos y Puntos Turísticos en El Salvador)
 -- División territorial real por departamentos, zonas geográficas y costos
 -- --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.locations (
@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS public.locations (
     name TEXT NOT NULL UNIQUE,
     description TEXT,
     category TEXT NOT NULL,
-    difficulty TEXT NOT NULL DEFAULT 'MEDIA',
+    difficulty TEXT DEFAULT 'MEDIA',
+    image_url TEXT,
+    images TEXT[],
     department TEXT NOT NULL DEFAULT 'San Salvador',
     zone TEXT NOT NULL DEFAULT 'Zona Central',
     price_category TEXT NOT NULL DEFAULT 'GRATUITO' CHECK (price_category IN ('GRATUITO', 'ECONÓMICO', 'MODERADO', 'EXCLUSIVO')),
@@ -94,7 +96,7 @@ CREATE TABLE IF NOT EXISTS public.locations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- Asegurar columnas para división territorial y costos si la tabla ya existía
+-- Asegurar columnas para división territorial, imágenes y costos si la tabla ya existía
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'locations' AND column_name = 'department') THEN
@@ -112,6 +114,18 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'locations' AND column_name = 'entry_fee') THEN
         ALTER TABLE public.locations ADD COLUMN entry_fee NUMERIC(10,2) DEFAULT 0.00;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'locations' AND column_name = 'image_url') THEN
+        ALTER TABLE public.locations ADD COLUMN image_url TEXT;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'locations' AND column_name = 'images') THEN
+        ALTER TABLE public.locations ADD COLUMN images TEXT[];
+    END IF;
+
+    -- Flexibilizar columna difficulty si existe restricción NOT NULL
+    ALTER TABLE public.locations ALTER COLUMN difficulty DROP NOT NULL;
+    ALTER TABLE public.locations ALTER COLUMN difficulty SET DEFAULT 'MEDIA';
 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'locations' AND column_name = 'exp_reward') THEN
         ALTER TABLE public.locations DROP COLUMN exp_reward;
@@ -243,6 +257,49 @@ CREATE TRIGGER trigger_profiles_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- --------------------------------------------------------------------
+-- 6b. TABLA: USER_SETTINGS (Ajustes y Preferencias de Usuario Offline/Online)
+-- --------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.user_settings (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    language TEXT NOT NULL DEFAULT 'es' CHECK (language IN ('es', 'en', 'zh', 'ru', 'pt')),
+    theme_mode TEXT NOT NULL DEFAULT 'dark' CHECK (theme_mode IN ('system', 'light', 'dark')),
+    font_scale NUMERIC(3,2) NOT NULL DEFAULT 1.00 CHECK (font_scale BETWEEN 0.80 AND 1.30),
+    traffic_layer_enabled BOOLEAN NOT NULL DEFAULT true,
+    notifications_enabled BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Asegurar columna font_scale y actualización de CHECK de idioma si la tabla ya existía
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_settings' AND column_name = 'font_scale') THEN
+        ALTER TABLE public.user_settings ADD COLUMN font_scale NUMERIC(3,2) NOT NULL DEFAULT 1.00 CHECK (font_scale BETWEEN 0.80 AND 1.30);
+    END IF;
+
+    -- Actualizar constraint de idioma si ya existía la versión previa ('es', 'en')
+    ALTER TABLE public.user_settings DROP CONSTRAINT IF EXISTS user_settings_language_check;
+    ALTER TABLE public.user_settings ADD CONSTRAINT user_settings_language_check CHECK (language IN ('es', 'en', 'zh', 'ru', 'pt'));
+END $$;
+
+ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "user_settings_owner_rw" ON public.user_settings;
+DROP POLICY IF EXISTS "user_settings_select_policy" ON public.user_settings;
+DROP POLICY IF EXISTS "user_settings_insert_policy" ON public.user_settings;
+DROP POLICY IF EXISTS "user_settings_update_policy" ON public.user_settings;
+
+CREATE POLICY "user_settings_owner_rw"
+ON public.user_settings FOR ALL TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+DROP TRIGGER IF EXISTS trigger_user_settings_updated_at ON public.user_settings;
+CREATE TRIGGER trigger_user_settings_updated_at
+  BEFORE UPDATE ON public.user_settings
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- --------------------------------------------------------------------
 -- 7. TRIGGER: AUTO-CREACIÓN Y SINCRONIZACIÓN DE PERFIL CON AUTH.USERS
 -- --------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
@@ -307,6 +364,25 @@ BEGIN
     full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
     avatar_url = COALESCE(EXCLUDED.avatar_url, public.profiles.avatar_url),
     updated_at = timezone('utc'::text, now());
+
+  -- Crear fila de preferencias iniciales para el usuario
+  INSERT INTO public.user_settings (
+    user_id,
+    language,
+    theme_mode,
+    font_scale,
+    traffic_layer_enabled,
+    notifications_enabled
+  )
+  VALUES (
+    NEW.id,
+    'es',
+    'dark',
+    1.00,
+    true,
+    true
+  )
+  ON CONFLICT (user_id) DO NOTHING;
 
   RETURN NEW;
 END;

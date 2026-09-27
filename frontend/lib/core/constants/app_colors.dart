@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Paleta de colores oficial para la interfaz de GeoTurismo.
+/// Paleta de colores oficial para la interfaz de Next Trip.
 /// Diseno visual organico y turistico moderno inspirado en la cartografia y naturaleza de El Salvador.
 class AppColors {
-  // --- PALETA OFICIAL GEOTURISMO ------------------------------------------
+  // --- PALETA OFICIAL NEXT TRIP ------------------------------------------
   /// Azul Ubicacion: Punteros, mapas y acentos primarios de navegacion
   static const Color locationBlue = Color(0xFF2A73B5);
 

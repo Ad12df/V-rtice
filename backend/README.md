@@ -1,6 +1,10 @@
-# 🌋 GeoTurismo — Backend API & Esquema de Base de Datos
+# 🌋 Next Trip — Backend API & Esquema de Base de Datos (v1.5.0 beta)
 
-Microservicio REST de alto rendimiento construido con **Node.js 22 LTS**, **TypeScript** y **Fastify v5**, complementado con **Supabase** (PostgreSQL 15 + PostGIS). Provee endpoints geoespaciales, autenticación con validación de roles (RBAC) y procedimientos almacenados para la plataforma **GeoTurismo**.
+> **Next Trip Backend API v1.5.0 beta**  
+> Desarrollado por **The Green Team**  
+> Fecha de edición: **Septiembre 2026**
+
+Microservicio REST de alto rendimiento construido con **Node.js 22 LTS**, **TypeScript 5** y **Fastify v5**, complementado con **Supabase** (PostgreSQL 15 + PostGIS). Provee endpoints geoespaciales para El Salvador, autenticación con validación de roles (RBAC) y procedimientos almacenados para la plataforma **Next Trip**.
 
 ---
 
@@ -15,7 +19,7 @@ Microservicio REST de alto rendimiento construido con **Node.js 22 LTS**, **Type
   - `supabaseClient` (Anon): Validación de tokens de usuario `Bearer JWT` mediante `auth.getUser()`.
   - `supabaseAdmin` (Service Role): Ejecución de funciones RPC PostGIS y administración de base de datos sin restricción RLS.
 - **Base de Datos:** PostgreSQL 15 con extensión geoespacial `postgis` en Supabase Cloud.
-- **Infraestructura:** Preparado para despliegue automatizado en [Render](https://render.com/) vía `render.yaml` y Dockerfile multi-stage.
+- **Infraestructura:** Despliegue en [Render](https://render.com/) vía `render.yaml` y Dockerfile multi-stage.
 
 ---
 
@@ -28,7 +32,7 @@ backend/
 │   │   ├── env.ts                  # Validación de variables de entorno con Zod
 │   │   └── supabase.ts             # Instancias cliente de Supabase (Anon y Admin)
 │   ├── db/
-│   │   └── schema.sql              # Esquema DDL completo: tablas, triggers, RLS y RPCs
+│   │   └── schema.sql              # Esquema DDL: tablas, triggers, RLS y RPCs
 │   ├── modules/
 │   │   ├── health/
 │   │   │   └── health.routes.ts   # GET /health
@@ -46,7 +50,7 @@ backend/
 ├── package.json                    # Dependencias y scripts
 ├── tsconfig.json                   # Configuración del compilador TypeScript
 ├── .env.example                    # Plantilla de variables de entorno
-└── README.md                       # Esta documentación
+└── README.md                       # Esta documentación técnica
 ```
 
 ---
@@ -55,10 +59,10 @@ backend/
 
 | Método | Ruta | Autenticación | Descripción | Respuesta Exitosa |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Pública | Verificación de estado y uptime del microservicio. | `200 OK` con JSON `{ status: "ok", service: "geoturismo-backend", uptime: ... }` |
-| `GET` | `/api/locations` | Pública | Listado completo de atalayas y destinos turísticos. Invoca RPC `get_all_locations()`. | `200 OK` con `{ success: true, count: N, data: [...] }` |
-| `GET` | `/api/v1/locations` | Pública | Alias versionado para consultar todas las atalayas. | `200 OK` con `{ success: true, count: N, data: [...] }` |
-| `GET` | `/api/v1/locations/:id` | Pública | Detalle de una atalaya específica por su UUID. | `200 OK` con el registro o `404 Not Found` |
+| `GET` | `/health` | Pública | Verificación de estado y uptime del microservicio. | `200 OK` con JSON `{ status: "ok", service: "nexttrip-backend", uptime: ... }` |
+| `GET` | `/api/locations` | Pública | Listado completo de destinos y lugares turísticos. Invoca RPC `get_all_locations()`. | `200 OK` con `{ success: true, count: N, data: [...] }` |
+| `GET` | `/api/v1/locations` | Pública | Alias versionado para consultar todos los destinos turísticos. | `200 OK` con `{ success: true, count: N, data: [...] }` |
+| `GET` | `/api/v1/locations/:id` | Pública | Detalle de un destino turístico específico por su UUID. | `200 OK` con el registro o `404 Not Found` |
 | `GET` | `/api/v1/places/nearby` | Pública | Búsqueda radial de destinos cercanos usando PostGIS `ST_DWithin`. Valida `lat`, `lng` y `radius` con Zod. | `200 OK` con `{ success: true, meta: { center, radiusInMeters, count }, data: [...] }` |
 | `GET` | `/api/v1/profiles/me` | Bearer JWT | Retorna el perfil y rol RBAC (`admin` o `user`) del usuario autenticado. | `200 OK` con datos del perfil o `401 Unauthorized` |
 | `GET` | `/api/v1/profiles/:id` | Pública | Perfil público de un usuario por su UUID. | `200 OK` con `{ id, role, full_name, username, avatar_url }` |
@@ -90,12 +94,12 @@ backend/
       {
         "id": "18f2f2bc-...",
         "name": "Centro Histórico de San Salvador",
-        "category": "NÚCLEO URBANO",
-        "difficulty": "BAJA",
+        "category": "CENTRO HISTÓRICO / CULTURAL",
         "department": "San Salvador",
         "zone": "Zona Central",
         "price_category": "GRATUITO",
         "entry_fee": 0.00,
+        "image_url": "https://.../centro_historico.jpg",
         "lat": 13.6983,
         "lng": -89.1914,
         "distance_meters": 2984.15
@@ -128,16 +132,17 @@ backend/
 
 ## 🗄️ Esquema de Base de Datos (`schema.sql`)
 
-El script [`schema.sql`](file:///backend/src/db/schema.sql) implementa un modelo de datos robusto con extensiones geoespaciales, seguridad a nivel de filas y sincronización reactiva de identidades.
+El script [`schema.sql`](file:///backend/src/db/schema.sql) implementa un modelo relacional y espacial optimizado:
 
 ### Diagrama Entidad-Relación Conceptual
 
 ```mermaid
 erDiagram
     auth_users ||--|| profiles : "1:1 vinculación (ON DELETE CASCADE)"
+    auth_users ||--|| user_settings : "1:1 preferencias (ON DELETE CASCADE)"
     profiles ||--o{ events : "organiza (organizer_id)"
-    profiles ||--o{ user_explorations : "registra visita (user_id)"
-    locations ||--o{ user_explorations : "es visitada (location_id)"
+    profiles ||--o{ user_explorations : "visita registrada (user_id)"
+    locations ||--o{ user_explorations : "destino visitado (location_id)"
 
     auth_users {
         UUID id PK
@@ -159,16 +164,28 @@ erDiagram
         timestamptz updated_at
     }
 
+    user_settings {
+        UUID user_id PK,FK "auth.users(id)"
+        string language "CHECK ('es', 'en') DEFAULT 'es'"
+        string theme_mode "CHECK ('system', 'light', 'dark') DEFAULT 'dark'"
+        boolean traffic_layer_enabled "DEFAULT true"
+        boolean notifications_enabled "DEFAULT true"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     locations {
         UUID id PK
         string name "UNIQUE"
         string description
         string category
-        string difficulty "DEFAULT 'MEDIA'"
+        string difficulty "DEFAULT 'MEDIA' (Opcional)"
+        string image_url "URL principal de fotografía"
+        string[] images "Arreglo de URLs de fotos"
         string department "14 departamentos de El Salvador"
         string zone "Zona Central, Occidental, etc."
         string price_category "GRATUITO, ECONÓMICO, MODERADO, EXCLUSIVO"
-        numeric entry_fee "Costo de entrada en USD"
+        numeric entry_fee "Tarifa de entrada en USD"
         geography location "GEOGRAPHY(Point, 4326)"
         timestamptz created_at
     }
@@ -198,66 +215,57 @@ erDiagram
     }
 ```
 
+### Nueva Tabla: `public.user_settings`
+Diseñada para almacenar de forma centralizada las preferencias de la aplicación:
+- **`user_id`**: Clave primaria con referencia en cascada a `auth.users(id)`.
+- **`language`**: Código de idioma activo (`es` para Español o `en` para Inglés).
+- **`theme_mode`**: Modo visual seleccionado (`system`, `light`, `dark`).
+- **`traffic_layer_enabled`**: Indicador booleano para la visibilidad de la capa de tráfico vial.
+- **`notifications_enabled`**: Preferencia de alertas y avisos del sistema.
+- **Políticas RLS:** Acceso y actualización restringidos al propio usuario (`auth.uid() = user_id`).
+
+### Flexibilización de `public.locations`
+- Soporte para URLs de fotografías mediante `image_url TEXT` e `images TEXT[]`.
+- Desvinculación de restricciones de dificultad (`difficulty` ahora es opcional con valor por defecto neutro `'MEDIA'`), eliminando su presencia en las interfaces de usuario.
+
 ---
 
 ## 🌐 Funciones Almacenadas PostGIS (RPC)
 
-Para evitar la transferencia de geometrías binarias complejas y acelerar las consultas espaciales en clientes móviles y web, `schema.sql` expone 3 funciones con `SECURITY DEFINER`:
+Para optimizar el ancho de banda y agilizar las consultas espaciales en clientes móviles, `schema.sql` expone funciones con `SECURITY DEFINER`:
 
 ### 1. `get_all_locations()`
-- **Propósito:** Retorna todas las atalayas con sus metadatos territoriales y extrae directamente la latitud y longitud numéricas mediante `ST_Y(l.location::geometry)` y `ST_X(l.location::geometry)`.
-- **Filtro de Seguridad:** Valida que el usuario invocante no esté suspendido (`is_banned() = false`).
-- **Uso en Backend:** Invocado en `locations.routes.ts` mediante `supabaseAdmin.rpc("get_all_locations")`.
+- Retorna el catálogo completo de destinos turísticos extrayendo latitud y longitud numéricas con `ST_Y(l.location::geometry)` y `ST_X(l.location::geometry)`.
+- Valida que el usuario no se encuentre suspendido (`is_banned() = false`).
 
 ### 2. `nearby_locations(user_lat, user_lng, radius_meters)`
-- **Parámetros:**
-  - `user_lat DOUBLE PRECISION`: Latitud de referencia.
-  - `user_lng DOUBLE PRECISION`: Longitud de referencia.
-  - `radius_meters DOUBLE PRECISION DEFAULT 50000`: Radio de corte en metros.
-- **Lógica Espacial:**
-  - Utiliza `ST_DWithin(l.location, ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography, radius_meters)` para filtrado por índice espacial GIST.
-  - Calcula la distancia métrica exacta en el elipsoide WGS84 con `ST_Distance(...)`.
-  - Ordena los resultados de menor a mayor distancia (`ORDER BY distance_meters ASC`).
+- Realiza el filtrado espacial mediante el operador `ST_DWithin` sobre índice `GIST`.
+- Calcula la distancia en metros sobre el elipsoide WGS84 y retorna los destinos ordenados por proximidad.
 
 ### 3. `get_all_events()`
-- **Propósito:** Retorna la agenda cronológica de eventos en El Salvador (`start_date ASC`), uniendo la información del perfil del organizador (`organizer_name` y `organizer_avatar`) y las coordenadas desempaquetadas.
+- Retorna la cartelera de eventos turísticos y culturales de El Salvador ordenada cronológicamente (`start_date ASC`), vinculando los datos del organizador.
 
 ---
 
-## ⚡ Triggers de Sincronización Automática
+## ⚡ Triggers Automatizados
 
 1. **`handle_new_user()` (`AFTER INSERT ON auth.users`):**
-   - Se activa cuando un usuario completa el registro en Supabase GoTrue.
-   - Extrae automáticamente `full_name`, `username`, `birthdate`, `avatar_url` y `role` desde `raw_user_meta_data`.
-   - Si el correo es el reservado `admin@vertice.app`, se le concede automáticamente el rol `'admin'`. En cualquier otro caso, se asegura el rol `'user'`.
-   - Inserta o actualiza el registro correspondiente en `public.profiles`.
-
+   - Extrae metadatos del usuario y crea automáticamente su perfil en `public.profiles`.
+   - Inserta su fila correspondiente en `public.user_settings` con los valores por defecto (`language: 'es'`, `theme_mode: 'dark'`, `traffic_layer_enabled: true`, `notifications_enabled: true`) usando `ON CONFLICT (user_id) DO NOTHING`.
 2. **`handle_user_email_sync()` (`AFTER UPDATE ON auth.users`):**
-   - Monitorea si el email fue actualizado en el módulo de autenticación y replica el nuevo valor en `public.profiles.email`.
-
-3. **`handle_updated_at()` (`BEFORE UPDATE ON public.profiles`):**
-   - Actualiza automáticamente la columna `updated_at` con `timezone('utc'::text, now())`.
+   - Mantiene sincronizado el correo electrónico en `public.profiles`.
+3. **`handle_updated_at()` (`BEFORE UPDATE`):**
+   - Actualiza la marca de tiempo `updated_at` en `profiles` y `user_settings`.
 
 ---
 
 ## 🛡️ Políticas de Seguridad Row Level Security (RLS)
 
-- **`profiles`:**
-  - Lectura pública para usuarios no suspendidos (`NOT is_banned()`).
-  - Inserción y actualización restringida al propio usuario (`auth.uid() = id`) o administradores (`is_admin()`).
-  - Eliminación exclusiva de administradores.
-- **`locations`:**
-  - Lectura pública para usuarios no suspendidos.
-  - Inserción, actualización y eliminación exclusivas para usuarios con rol `admin`.
-- **`events`:**
-  - Lectura pública.
-  - Inserción permitida a cualquier usuario autenticado no suspendido (asociando su `organizer_id`).
-  - Modificación y eliminación restringida al creador del evento (`organizer_id = auth.uid()`) o administradores.
-- **`user_explorations`:**
-  - Lectura y escritura limitada al usuario propietario del registro (`auth.uid() = user_id`) o administradores.
-- **Bucket `storage.objects` (`avatars`):**
-  - Lectura pública de avatares.
-  - Subida, edición y borrado restringidos a la carpeta del propio usuario (`auth.uid()::text = split_part(name, '/', 1)`) o administradores.
+- **`user_settings`:** Lectura, inserción y actualización exclusivas del propio usuario (`auth.uid() = user_id`).
+- **`profiles`:** Lectura pública para usuarios activos; actualización restringida al propio usuario o administradores.
+- **`locations`:** Lectura pública; inserción, edición y borrado reservados a usuarios con rol `admin`.
+- **`events`:** Lectura pública; inserción permitida a usuarios autenticados; edición restringida al organizador o administradores.
+- **`storage.objects` (`avatars`):** Lectura pública; escritura restringida a la carpeta del propio usuario (`auth.uid()`).
 
 ---
 
@@ -276,27 +284,14 @@ SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key-secreta
 
 ### 2. Comandos de Terminal
 ```bash
-# Instalar paquetes
-npm install
-
-# Modo desarrollo con recarga en caliente (tsx watch)
-npm run dev
-
-# Compilar TypeScript a JavaScript estándar (/dist)
-npm run build
-
-# Ejecutar versión compilada en producción
-npm start
-
-# Limpiar artefactos compilados
-npm run clean
+npm install        # Instalar dependencias
+npm run dev        # Modo desarrollo con recarga automática
+npm run build      # Compilar TypeScript a /dist
+npm start          # Ejecutar en producción
 ```
 
 ### 3. Despliegue con Docker
 ```bash
-# Construir imagen multi-etapa
-docker build -t geoturismo-backend .
-
-# Ejecutar contenedor
-docker run -d -p 3000:3000 --env-file .env --name geoturismo-api geoturismo-backend
+docker build -t nexttrip-backend .
+docker run -d -p 3000:3000 --env-file .env --name nexttrip-api nexttrip-backend
 ```

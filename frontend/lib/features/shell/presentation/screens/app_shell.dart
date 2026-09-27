@@ -202,7 +202,7 @@ class _AppShellState extends State<AppShell> {
           side: BorderSide(color: AppColors.turquoise, width: 2.0),
         ),
         onPressed: _onRecenterGpsPressed,
-        tooltip: 'Recentrar GPS en Operador',
+        tooltip: 'Recentrar en mi ubicación',
         child: Container(
           width: 56,
           height: 56,

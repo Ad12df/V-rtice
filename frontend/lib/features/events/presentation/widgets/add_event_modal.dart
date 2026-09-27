@@ -68,7 +68,7 @@ class _AddEventModalState extends State<AddEventModal> {
   ];
 
   static const List<String> categories = [
-    'EXPEDICIÓN TÁCTICA',
+    'EXCURSIÓN / AVENTURA',
     'SURF & PLAYA',
     'CULTURA & ARTE',
     'CONFERENCIA TECNOLÓGICA',
@@ -76,6 +76,7 @@ class _AddEventModalState extends State<AddEventModal> {
     'GASTRONOMÍA',
     'CAMPAMENTO',
     'MÚSICA & FESTIVAL',
+    'EXPEDICIÓN TÁCTICA',
   ];
 
   static const List<String> priceCategories = [
@@ -356,7 +357,7 @@ class _AddEventModalState extends State<AddEventModal> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'PUBLICAR EVENTO TÁCTICO',
+                          'PUBLICAR EVENTO TURÍSTICO',
                           style: TextStyle(
                             color: AppColors.goldenOrange,
                             fontSize: 14,
@@ -415,7 +416,7 @@ class _AddEventModalState extends State<AddEventModal> {
                         const SizedBox(height: 14),
 
                         // LUGAR / NOMBRE DE UBICACIÓN
-                        _buildLabel('NOMBRE DEL LUGAR O ATALAYA *'),
+                        _buildLabel('NOMBRE DEL LUGAR O DESTINO TURÍSTICO *'),
                         TextFormField(
                           controller: _locationNameController,
                           style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
@@ -637,7 +638,7 @@ class _AddEventModalState extends State<AddEventModal> {
                         )
                       : const Icon(Icons.publish_rounded, size: 18),
                   label: Text(
-                    _isSaving ? 'PUBLICANDO EN SUPABASE...' : 'PUBLICAR EVENTO TÁCTICO',
+                    _isSaving ? 'GUARDANDO EVENTO...' : 'PUBLICAR EVENTO TURÍSTICO',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1),
                   ),
                 ),

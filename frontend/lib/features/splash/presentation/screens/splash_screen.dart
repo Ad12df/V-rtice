@@ -24,11 +24,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Timer? _navigationTimer;
 
   final List<String> _telemetryMessages = [
-    'INICIALIZANDO SATELITES SV...',
-    'CALIBRANDO NIEBLA DE GUERRA...',
-    'DESTRABANDO PROTOCOLOS DE CARTOGRAFIA...',
-    'SINCRONIZANDO DESTINOS Y PUNTOS DE INTERES...',
-    'ESTABLECIENDO CONEXION CON GEOTURISMO...',
+    'Inicializando geolocalización SV...',
+    'Configurando mapa interactivo...',
+    'Cargando mapa y destinos de El Salvador...',
+    'Sincronizando destinos y puntos de interés...',
+    'Conectando con Next Trip...',
   ];
 
   @override
@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               ),
                               const SizedBox(width: 8),
                               const Text(
-                                'SYS-BOOT // V1.0',
+                                'SYS-BOOT // v1.4.0 (beta)',
                                 style: TextStyle(
                                   color: AppColors.turquoise,
                                   fontSize: 10,
@@ -241,7 +241,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       const SizedBox(height: 32),
                       // Title Typography
                       Text(
-                        'G E O T U R I S M O',
+                        'N E X T   T R I P',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: titleFontSize,
@@ -251,7 +251,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'TURISMO TACTICO & CARTOGRAFIA // SV',
+                        'Turismo y Cartografía de El Salvador',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
@@ -304,7 +304,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'COORD: 13.7942 N, 88.8965 W // GEOTURISMO CORE',
+                        'El Salvador // Next Trip v1.4.0 (beta)',
                         style: TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 10,

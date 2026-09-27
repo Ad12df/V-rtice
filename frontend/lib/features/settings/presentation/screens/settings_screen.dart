@@ -222,7 +222,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'FOTO DE PERFIL DE OPERADOR',
+                'FOTO DE PERFIL',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 14,
@@ -425,12 +425,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'GEOTURISMO // AJUSTES',
+              'NEXT TRIP // AJUSTES',
               style: TextStyle(
                 color: AppColors.turquoise,
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.turquoise.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: AppColors.turquoise.withValues(alpha: 0.4),
+                  width: 0.8,
+                ),
+              ),
+              child: const Text(
+                'v1.5.0 (beta)',
+                style: TextStyle(
+                  color: AppColors.turquoise,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
           ],
@@ -564,7 +585,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const SizedBox(height: 28),
-          _buildIlluminatedHeader('IDENTIDAD DEL OPERADOR', Icons.badge_outlined),
+          _buildIlluminatedHeader('DATOS DEL USUARIO', Icons.badge_outlined),
 
           // ─── DATOS DEL PERFIL (Solo Lectura) ───────────────────────
           _buildReadOnlyField(
@@ -594,7 +615,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // ─── PANEL DE CONTROL ADMINISTRATIVO (SOLO ADMIN) ───────────
           if (profile?.isAdmin ?? false) ...[
             const SizedBox(height: 28),
-            _buildIlluminatedHeader('CONSOLA DE COMANDO ADMIN', Icons.admin_panel_settings_rounded),
+            _buildIlluminatedHeader('PANEL DE ADMINISTRACIÓN', Icons.admin_panel_settings_rounded),
             _buildAdminPanelCard(context),
           ],
 
@@ -763,7 +784,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     : AppColors.cyan,
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w800,
-                                fontFamily: 'monospace',
                                 letterSpacing: 0.8,
                               ),
                             ),
@@ -782,7 +802,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListenableBuilder(
             listenable: SettingsProvider.instance,
             builder: (context, _) {
-              final currentScale = SettingsProvider.instance.textScaleFactor;
+              final currentScale = SettingsProvider.instance.fontScale;
               return _buildPreferenceCard(
                 title: context.loc.fontScale,
                 icon: Icons.format_size_rounded,
@@ -792,28 +812,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Expanded(
                           child: _buildScaleOption(
-                            label: context.loc.fontSmall,
+                            label: '0.85x',
+                            sublabel: context.loc.fontSmall,
                             scaleValue: 0.85,
                             isSelected: (currentScale - 0.85).abs() < 0.05,
-                            onTap: () => SettingsProvider.instance.setTextScaleFactor(0.85),
+                            onTap: () => SettingsProvider.instance.setFontScale(0.85),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: _buildScaleOption(
-                            label: context.loc.fontNormal,
-                            scaleValue: 1.0,
-                            isSelected: (currentScale - 1.0).abs() < 0.05,
-                            onTap: () => SettingsProvider.instance.setTextScaleFactor(1.0),
+                            label: '1.00x',
+                            sublabel: context.loc.fontNormal,
+                            scaleValue: 1.00,
+                            isSelected: (currentScale - 1.00).abs() < 0.05,
+                            onTap: () => SettingsProvider.instance.setFontScale(1.00),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: _buildScaleOption(
-                            label: context.loc.fontLarge,
+                            label: '1.15x',
+                            sublabel: context.loc.fontLarge,
+                            scaleValue: 1.15,
+                            isSelected: (currentScale - 1.15).abs() < 0.05,
+                            onTap: () => SettingsProvider.instance.setFontScale(1.15),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: _buildScaleOption(
+                            label: '1.25x',
+                            sublabel: context.loc.fontExtraLarge,
                             scaleValue: 1.25,
                             isSelected: (currentScale - 1.25).abs() < 0.05,
-                            onTap: () => SettingsProvider.instance.setTextScaleFactor(1.25),
+                            onTap: () => SettingsProvider.instance.setFontScale(1.25),
                           ),
                         ),
                       ],
@@ -848,7 +881,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'VÉRTICE SV: LAT 13.7942° N | LON 88.8965° W',
+                            'NEXT TRIP SV: LAT 13.7942° N | LON 88.8965° W',
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: (11.5 * currentScale).clamp(8.0, 18.0),
@@ -866,7 +899,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // ─── SELECTOR DE IDIOMA (i18n) CON PREVISUALIZACIÓN VIVA ───
+          // ─── SELECTOR DE IDIOMA (5 IDIOMAS OFICIALES) ─────────────
           ListenableBuilder(
             listenable: SettingsProvider.instance,
             builder: (context, _) {
@@ -876,26 +909,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.translate_rounded,
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildLangOption(
-                            label: 'Español (ES)',
-                            code: 'es',
-                            isSelected: currentLang == 'es',
-                            onTap: () => SettingsProvider.instance.setLocale(const Locale('es')),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildLangOption(
-                            label: 'English (US)',
-                            code: 'en',
-                            isSelected: currentLang == 'en',
-                            onTap: () => SettingsProvider.instance.setLocale(const Locale('en')),
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final halfWidth = (constraints.maxWidth - 8) / 2;
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            SizedBox(
+                              width: halfWidth,
+                              child: _buildLangOption(
+                                label: 'Español',
+                                code: 'es',
+                                flag: '🇸🇻',
+                                isSelected: currentLang == 'es',
+                                onTap: () => SettingsProvider.instance.setLocale(const Locale('es')),
+                              ),
+                            ),
+                            SizedBox(
+                              width: halfWidth,
+                              child: _buildLangOption(
+                                label: 'English',
+                                code: 'en',
+                                flag: '🇺🇸',
+                                isSelected: currentLang == 'en',
+                                onTap: () => SettingsProvider.instance.setLocale(const Locale('en')),
+                              ),
+                            ),
+                            SizedBox(
+                              width: halfWidth,
+                              child: _buildLangOption(
+                                label: '简体中文',
+                                code: 'zh',
+                                flag: '🇨🇳',
+                                isSelected: currentLang == 'zh',
+                                onTap: () => SettingsProvider.instance.setLocale(const Locale('zh')),
+                              ),
+                            ),
+                            SizedBox(
+                              width: halfWidth,
+                              child: _buildLangOption(
+                                label: 'Русский',
+                                code: 'ru',
+                                flag: '🇷🇺',
+                                isSelected: currentLang == 'ru',
+                                onTap: () => SettingsProvider.instance.setLocale(const Locale('ru')),
+                              ),
+                            ),
+                            SizedBox(
+                              width: constraints.maxWidth,
+                              child: _buildLangOption(
+                                label: 'Português',
+                                code: 'pt',
+                                flag: '🇧🇷',
+                                isSelected: currentLang == 'pt',
+                                onTap: () => SettingsProvider.instance.setLocale(const Locale('pt')),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 10),
                     // Tarjeta interactiva con traducción en vivo
@@ -912,9 +985,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              currentLang == 'es'
-                                  ? 'RED VÉRTICE // SISTEMA TÁCTICO EL SALVADOR ONLINE'
-                                  : 'GEOTURISMO NETWORK // EL SALVADOR TACTICAL SYSTEM ONLINE',
+                              context.loc.appSubtitle.toUpperCase(),
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 9.5,
@@ -929,6 +1000,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // ─── CONMUTADOR CAPA DE TRÁFICO (CLOUD SYNC) ────────────────
+          ListenableBuilder(
+            listenable: SettingsProvider.instance,
+            builder: (context, _) {
+              final trafficEnabled = SettingsProvider.instance.trafficLayerEnabled;
+              return _buildPreferenceToggle(
+                icon: Icons.traffic_rounded,
+                title: context.loc.trafficLayer,
+                subtitle: trafficEnabled
+                    ? context.loc.trafficNormal
+                    : context.loc.trafficCongested,
+                value: trafficEnabled,
+                onChanged: (val) {
+                  SettingsProvider.instance.setTrafficLayerEnabled(val);
+                },
               );
             },
           ),
@@ -1000,7 +1091,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           const Center(
             child: Text(
-              'SISTEMA DE CARTOGRAFÍA // SV-2026',
+              'NEXT TRIP // v1.5.0 (beta) // SV-2026',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 9,
@@ -1322,6 +1413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildScaleOption({
     required String label,
+    String? sublabel,
     required double scaleValue,
     required bool isSelected,
     required VoidCallback onTap,
@@ -1331,7 +1423,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.cyan.withValues(alpha: 0.18)
@@ -1348,19 +1440,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text(
               'Aa',
               style: TextStyle(
-                fontSize: 12 * scaleValue,
+                fontSize: 11 * scaleValue,
                 fontWeight: FontWeight.bold,
                 color: isSelected ? AppColors.cyan : AppColors.textMuted,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isSelected ? AppColors.cyan : AppColors.textSecondary,
                 fontSize: 9.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                fontFamily: 'monospace',
               ),
             ),
           ],
@@ -1372,6 +1465,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildLangOption({
     required String label,
     required String code,
+    String? flag,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
@@ -1380,7 +1474,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.cyan.withValues(alpha: 0.18)
@@ -1391,15 +1485,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
             width: isSelected ? 1.5 : 1,
           ),
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppColors.cyan : AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (flag != null) ...[
+              Text(flag, style: const TextStyle(fontSize: 13)),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? AppColors.cyan : AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.cyan.withValues(alpha: 0.25)
+                    : AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                code.toUpperCase(),
+                style: TextStyle(
+                  color: isSelected ? AppColors.cyan : AppColors.textMuted,
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1598,7 +1721,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'GESTIÓN DE OPERADORES',
+                      'GESTIÓN DE USUARIOS Y CUENTAS',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 13,
@@ -1624,7 +1747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Audita la nómina de usuarios registrados en el sistema, consulta estados y suspende o reactiva accesos en tiempo real con efecto inmediato en la red táctica.',
+            'Audita la lista de usuarios registrados en el sistema, consulta estados y gestiona suspensiones o reactivaciones de cuentas en tiempo real.',
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11.5,
@@ -1649,7 +1772,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               icon: const Icon(Icons.people_alt_rounded, size: 18),
               label: const Text(
-                'ABRIR CONSOLA DE OPERADORES',
+                'ABRIR PANEL DE USUARIOS',
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w900,

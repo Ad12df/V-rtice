@@ -121,13 +121,7 @@ class _AdvancedSearchModalState extends State<AdvancedSearchModal> {
     'Exclusivo (\$\$\$)',
   ];
 
-  // Niveles de dificultad táctica
-  static const List<String> difficulties = [
-    'BAJA',
-    'MEDIA',
-    'ALTA',
-    'ÉPICA',
-  ];
+
 
   @override
   void initState() {
@@ -149,10 +143,7 @@ class _AdvancedSearchModalState extends State<AdvancedSearchModal> {
           !poi.priceRange.toLowerCase().contains(_criteria.selectedPriceRange!.toLowerCase().replaceAll(RegExp(r'[\(\$\)]'), '').trim())) {
         return false;
       }
-      if (_criteria.selectedDifficulty != null &&
-          poi.difficulty.toUpperCase() != _criteria.selectedDifficulty!.toUpperCase()) {
-        return false;
-      }
+
       return true;
     }).toList();
   }
@@ -358,33 +349,7 @@ class _AdvancedSearchModalState extends State<AdvancedSearchModal> {
                   ),
                   const SizedBox(height: 20),
 
-                  // 4. FILTRO DE DIFICULTAD
-                  _buildSectionTitle('DIFICULTAD / EXIGENCIA', Icons.military_tech_outlined),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildChip(
-                        label: 'TODAS',
-                        isSelected: _criteria.selectedDifficulty == null,
-                        onTap: () => setState(() {
-                          _criteria = _criteria.copyWith(clearDifficulty: true);
-                        }),
-                      ),
-                      ...difficulties.map((diff) => _buildChip(
-                            label: diff,
-                            isSelected: _criteria.selectedDifficulty == diff,
-                            onTap: () => setState(() {
-                              _criteria = _criteria.copyWith(
-                                selectedDifficulty: _criteria.selectedDifficulty == diff ? null : diff,
-                                clearDifficulty: _criteria.selectedDifficulty == diff,
-                              );
-                            }),
-                          )),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
+
 
                   // RESULTADOS COINCIDENTES EN VIVO
                   Row(

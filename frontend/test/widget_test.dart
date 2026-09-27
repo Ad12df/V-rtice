@@ -4,7 +4,7 @@ import 'package:vertice/main.dart';
 void main() {
   testWidgets('VerticeApp splash smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const VerticeApp());
-    expect(find.text('G E O T U R I S M O'), findsOneWidget);
-    expect(find.text('SYS-BOOT // V1.0'), findsOneWidget);
+    expect(find.text('N E X T   T R I P'), findsOneWidget);
+    expect(find.text('SYS-BOOT // v1.4.0 (beta)'), findsOneWidget);
   });
 }
